@@ -9,7 +9,7 @@ const helmet = require('helmet');
 const session = require('express-session');
 
 const { initializeDB, query } = require('./config/database');
-const aiController = require('./controllers/aiController');
+const appRoutes = require('./routes/appRoutes');
 
 const app = express();
 
@@ -141,120 +141,7 @@ app.post('/logout', (req, res) => {
   });
 });
 
-app.get('/dashboard', requireAuth, asyncHandler(async (req, res) => {
-  const courses = await query('SELECT id, topic, progress FROM courses WHERE user_id = ? ORDER BY id DESC', [
-    req.session.user.id
-  ]);
-
-  res.render('dashboard', {
-    title: 'Dashboard',
-    courses
-  });
-}));
-
-app.post('/assessments/start', requireAuth, asyncHandler(async (req, res) => {
-  const topic = (req.body.topic || '').trim();
-  if (!topic) {
-    return res.redirect('/dashboard?error=' + encodeURIComponent('Please enter a topic.'));
-  }
-
-  let quiz;
-  try {
-    quiz = await aiController.generateQuiz(topic);
-  } catch (err) {
-    return res.redirect('/dashboard?error=' + encodeURIComponent(err.message || 'Failed to generate quiz.'));
-  }
-
-  req.session.currentAssessment = {
-    topic,
-    quiz,
-    createdAt: Date.now()
-  };
-
-  res.render('quiz', {
-    title: `Assessment: ${topic}`,
-    topic,
-    quiz
-  });
-}));
-
-app.post('/assessments/submit', requireAuth, asyncHandler(async (req, res) => {
-  const current = req.session.currentAssessment;
-  if (!current || !current.quiz || !current.topic) {
-    return res.redirect('/dashboard?error=' + encodeURIComponent('No active assessment found.'));
-  }
-
-  const topic = current.topic;
-  const quiz = current.quiz;
-
-  const userAnswers = quiz.map((_, idx) => {
-    const raw = req.body[`q${idx}`];
-    const parsed = Number.parseInt(raw, 10);
-    return Number.isInteger(parsed) ? parsed : null;
-  });
-
-  let quizResults;
-  try {
-    quizResults = await aiController.gradeQuiz(topic, quiz, userAnswers);
-  } catch (err) {
-    return res.redirect('/dashboard?error=' + encodeURIComponent(err.message || 'Failed to grade quiz.'));
-  }
-
-  let syllabus;
-  try {
-    syllabus = await aiController.generateSyllabus(topic, quizResults);
-  } catch (err) {
-    return res.redirect('/dashboard?error=' + encodeURIComponent(err.message || 'Failed to generate syllabus.'));
-  }
-
-  const feedbackText = quizResults.feedback_text || '';
-
-  await query('INSERT INTO assessments (user_id, topic, score, feedback_text) VALUES (?, ?, ?, ?)', [
-    req.session.user.id,
-    topic,
-    quizResults.score,
-    feedbackText
-  ]);
-
-  const courseInsert = await query(
-    'INSERT INTO courses (user_id, topic, syllabus_json, progress) VALUES (?, ?, ?, ?)',
-    [req.session.user.id, topic, JSON.stringify(syllabus), 0]
-  );
-
-  delete req.session.currentAssessment;
-
-  res.redirect(`/courses/${courseInsert.insertId}?message=` + encodeURIComponent('Course generated from your assessment.'));
-}));
-
-app.get('/courses/:id', requireAuth, asyncHandler(async (req, res) => {
-  const courseId = Number.parseInt(req.params.id, 10);
-  if (!Number.isInteger(courseId)) {
-    return res.redirect('/dashboard?error=' + encodeURIComponent('Invalid course id.'));
-  }
-
-  const rows = await query('SELECT id, topic, syllabus_json, progress FROM courses WHERE id = ? AND user_id = ? LIMIT 1', [
-    courseId,
-    req.session.user.id
-  ]);
-
-  const course = rows[0];
-  if (!course) {
-    return res.redirect('/dashboard?error=' + encodeURIComponent('Course not found.'));
-  }
-
-  let syllabus = [];
-  try {
-    syllabus = typeof course.syllabus_json === 'string' ? JSON.parse(course.syllabus_json) : course.syllabus_json;
-  } catch (_) {
-    syllabus = [];
-  }
-
-  res.render('course', {
-    title: course.topic,
-    course,
-    syllabus
-  });
-}));
+app.use('/', appRoutes);
 
 app.use((req, res) => {
   res.status(404).render('error', {

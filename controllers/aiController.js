@@ -139,54 +139,94 @@ async function gradeQuiz(topic, quiz, userAnswers) {
   };
 }
 
-async function generateSyllabus(topic, quizResults) {
-  const model = getModel();
+async function evaluateAndCreateSyllabus(subject, userAnswers, quizQuestions) {
+  // 1. Grade the quiz
+  const gradingResult = await gradeQuiz(subject, quizQuestions, userAnswers);
+  const { score, weak_topics } = gradingResult;
 
-  const score = quizResults?.score ?? 'unknown';
-  const weakTopics = Array.isArray(quizResults?.weak_topics) ? quizResults.weak_topics : [];
+  // 2. Generate Syllabus
+  const model = getModel();
 
   const prompt = [
     'Return ONLY valid JSON. No markdown. No code fences.',
     'You are creating a personalized syllabus for a learner.',
-    `User scored ${score} out of 5 on topic "${topic}".`,
-    `They struggled with: ${weakTopics.length ? weakTopics.join(', ') : 'unspecified weak areas'}.`,
+    `User scored ${score} out of 5 on topic "${subject}".`,
+    `Failed/Weak areas: ${weak_topics.length ? weak_topics.join(', ') : 'none'}.`,
     '',
-    'Generate a 6-module syllabus that prioritizes the weaknesses but still covers fundamentals in a coherent progression.',
-    'Return an array of exactly 6 modules. Each module must be an object with:',
+    'Create a 6-module syllabus.',
+    'If score is low (0-2), start with basics/fundamentals. If score is high (4-5), skip to advanced topics.',
+    'Each module must be an object with:',
     '- title (string)',
-    '- summary (string)',
-    '- objectives (array of 3-6 bullet strings)',
-    '- practice (array of 2-4 bullet strings)',
+    '- description (string)',
+    '- topics (array of strings - subtopics to cover)',
     '',
-    'Example shape:',
-    '[',
-    '  { "title": "Module 1: ...", "summary": "...", "objectives": ["..."], "practice": ["..."] }',
-    ']',
-    '',
-    `Quiz results context: ${JSON.stringify(quizResults)}`
+    'JSON shape:',
+    '{',
+    '  "syllabus": [',
+    '    { "title": "...", "description": "...", "topics": ["...", "..."] }',
+    '  ],',
+    '  "level": "Beginner | Intermediate | Advanced"',
+    '}',
   ].join('\n');
 
   const result = await model.generateContent(prompt);
   const text = result?.response?.text?.() || '';
   const parsed = extractJsonFromText(text);
 
-  if (!Array.isArray(parsed) || parsed.length !== 6) {
-    throw new Error('AI syllabus must be an array of exactly 6 modules');
+  if (!parsed || !Array.isArray(parsed.syllabus) || parsed.syllabus.length !== 6) {
+    throw new Error('AI syllabus must be an array of exactly 6 modules inside "syllabus" property');
   }
 
-  parsed.forEach((m, idx) => {
-    if (!m || typeof m !== 'object') throw new Error(`Invalid module at index ${idx}`);
-    if (typeof m.title !== 'string' || !m.title.trim()) throw new Error(`Module title missing at index ${idx}`);
-    if (typeof m.summary !== 'string') throw new Error(`Module summary missing at index ${idx}`);
-    if (!Array.isArray(m.objectives)) throw new Error(`Module objectives missing at index ${idx}`);
-    if (!Array.isArray(m.practice)) throw new Error(`Module practice missing at index ${idx}`);
+  // Sanitize
+  parsed.syllabus.forEach((m, idx) => {
+      m.title = m.title || `Module ${idx+1}`;
+      m.description = m.description || '';
+      m.topics = Array.isArray(m.topics) ? m.topics : [];
   });
+  
+  const level = parsed.level || (score < 3 ? 'Beginner' : (score < 5 ? 'Intermediate' : 'Advanced'));
 
-  return parsed;
+  return {
+    syllabus: parsed.syllabus,
+    level,
+    grading: gradingResult
+  };
+}
+
+async function generateLesson(topic, userLevel) {
+  const model = getModel();
+
+  const prompt = [
+    `Write a comprehensive tutorial for "${topic}" suitable for a ${userLevel} student.`,
+    'Use Markdown formatting.',
+    'Include clear explanations, code examples (if technical), and practical applications.',
+    'Do not wrap in JSON. Return raw Markdown text.',
+  ].join('\n');
+
+  const result = await model.generateContent(prompt);
+  const text = result?.response?.text?.() || '';
+  
+  if (!text) throw new Error('AI failed to generate lesson content');
+  
+  // Strip markdown code fences if the model wrapped the whole response in one (e.g. ```markdown ... ```)
+  // But be careful not to strip internal code blocks.
+  // Generally the model returns raw text if asked, but sometimes wraps it.
+  // Let's just return the text, but maybe clean up leading/trailing ``` if it's wrapping the whole thing.
+  
+  let cleanText = text.trim();
+  if (cleanText.startsWith('```markdown')) {
+      cleanText = cleanText.replace(/^```markdown\s*/i, '').replace(/\s*```$/i, '');
+  } else if (cleanText.startsWith('```') && !cleanText.includes('\n```', 4)) {
+      // If it starts with ``` and ends with ``` and looks like a single block wrapper
+       cleanText = cleanText.replace(/^```\s*/i, '').replace(/\s*```$/i, '');
+  }
+
+  return cleanText;
 }
 
 module.exports = {
   generateQuiz,
   gradeQuiz,
-  generateSyllabus
+  evaluateAndCreateSyllabus,
+  generateLesson
 };
