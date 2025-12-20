@@ -1,0 +1,12 @@
+<div class="mx-auto max-w-3xl px-6 py-12">
+  <div class="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-8">
+    <p class="text-xs font-semibold tracking-widest text-zinc-400">ERROR <%= statusCode || 500 %></p>
+    <h1 class="mt-3 text-2xl font-semibold text-zinc-100">Something went wrong</h1>
+    <p class="mt-3 text-sm text-zinc-400"><%= errorMessage || 'Unexpected error.' %></p>
+
+    <div class="mt-6 flex gap-3">
+      <a href="/" class="rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-500">Go home</a>
+      <a href="/dashboard" class="rounded-md border border-zinc-800 bg-zinc-950 px-4 py-2 text-zinc-200 hover:bg-zinc-900">Dashboard</a>
+    </div>
+  </div>
+</div>

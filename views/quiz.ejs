@@ -1,0 +1,29 @@
+<div class="mx-auto max-w-4xl px-6 py-8">
+  <div class="flex items-start justify-between gap-6">
+    <div>
+      <h1 class="text-2xl font-semibold text-zinc-100">Assessment</h1>
+      <p class="mt-1 text-sm text-zinc-400">Topic: <span class="text-zinc-200"><%= topic %></span></p>
+    </div>
+    <a href="/dashboard" class="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900">Back</a>
+  </div>
+
+  <form method="POST" action="/assessments/submit" class="mt-8 space-y-4">
+    <% quiz.forEach(function(q, idx) { %>
+      <div class="rounded-xl border border-zinc-800 bg-zinc-950/40 p-5">
+        <p class="text-sm text-zinc-400">Question <%= idx + 1 %> of <%= quiz.length %></p>
+        <h2 class="mt-2 text-base font-semibold text-zinc-100"><%= q.question %></h2>
+
+        <div class="mt-4 space-y-2">
+          <% q.options.forEach(function(opt, optIdx) { %>
+            <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 hover:bg-zinc-900">
+              <input type="radio" name="q<%= idx %>" value="<%= optIdx %>" class="mt-1" required />
+              <span class="text-sm text-zinc-200"><%= opt %></span>
+            </label>
+          <% }) %>
+        </div>
+      </div>
+    <% }) %>
+
+    <button type="submit" class="w-full rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-500">Submit answers</button>
+  </form>
+</div>
