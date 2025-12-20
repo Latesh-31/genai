@@ -50,3 +50,16 @@ CREATE TABLE IF NOT EXISTS lesson_completions (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
 );
+
+-- NEW TABLE: Stores AI-generated lesson content to prevent re-generation
+CREATE TABLE IF NOT EXISTS lessons (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  course_id INTEGER NOT NULL,
+  module_index INTEGER NOT NULL,
+  topic_index INTEGER NOT NULL,
+  title TEXT,
+  content_json TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(course_id, module_index, topic_index),
+  FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+);
