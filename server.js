@@ -8,7 +8,7 @@ const expressLayouts = require('express-ejs-layouts');
 const helmet = require('helmet');
 const session = require('express-session');
 
-const { query } = require('./config/database');
+const { initializeDB, query } = require('./config/database');
 const aiController = require('./controllers/aiController');
 
 const app = express();
@@ -96,7 +96,7 @@ app.post('/register', asyncHandler(async (req, res) => {
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const result = await query('INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)', [
+  const result = await query('INSERT INTO users (name, email, password) VALUES (?, ?, ?)', [
     name,
     email,
     passwordHash
@@ -119,14 +119,14 @@ app.post('/login', asyncHandler(async (req, res) => {
     return res.redirect('/login?error=' + encodeURIComponent('Email and password are required.'));
   }
 
-  const users = await query('SELECT id, name, email, password_hash FROM users WHERE email = ? LIMIT 1', [email]);
+  const users = await query('SELECT id, name, email, password FROM users WHERE email = ? LIMIT 1', [email]);
   const user = users[0];
 
   if (!user) {
     return res.redirect('/login?error=' + encodeURIComponent('Invalid email or password.'));
   }
 
-  const ok = await bcrypt.compare(password, user.password_hash);
+  const ok = await bcrypt.compare(password, user.password);
   if (!ok) {
     return res.redirect('/login?error=' + encodeURIComponent('Invalid email or password.'));
   }
@@ -142,10 +142,9 @@ app.post('/logout', (req, res) => {
 });
 
 app.get('/dashboard', requireAuth, asyncHandler(async (req, res) => {
-  const courses = await query(
-    'SELECT id, topic, progress, created_at, updated_at FROM courses WHERE user_id = ? ORDER BY updated_at DESC',
-    [req.session.user.id]
-  );
+  const courses = await query('SELECT id, topic, progress FROM courses WHERE user_id = ? ORDER BY id DESC', [
+    req.session.user.id
+  ]);
 
   res.render('dashboard', {
     title: 'Dashboard',
@@ -233,10 +232,10 @@ app.get('/courses/:id', requireAuth, asyncHandler(async (req, res) => {
     return res.redirect('/dashboard?error=' + encodeURIComponent('Invalid course id.'));
   }
 
-  const rows = await query(
-    'SELECT id, topic, syllabus_json, progress, created_at, updated_at FROM courses WHERE id = ? AND user_id = ? LIMIT 1',
-    [courseId, req.session.user.id]
-  );
+  const rows = await query('SELECT id, topic, syllabus_json, progress FROM courses WHERE id = ? AND user_id = ? LIMIT 1', [
+    courseId,
+    req.session.user.id
+  ]);
 
   const course = rows[0];
   if (!course) {
@@ -281,6 +280,16 @@ app.use((err, req, res, next) => {
 });
 
 const port = Number(process.env.PORT || 3000);
-app.listen(port, () => {
-  console.log(`AdaptLearn AI running on http://localhost:${port}`);
+
+async function start() {
+  await initializeDB();
+
+  app.listen(port, () => {
+    console.log(`AdaptLearn AI running on http://localhost:${port}`);
+  });
+}
+
+start().catch((err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
