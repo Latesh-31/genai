@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-6xl px-6 py-12">
+<div class="mx-auto max-w-6xl px-6 py-12 opacity-0 animate-[fadeIn_.45s_ease-out_forwards]">
   <% if (message) { %>
     <div class="mb-8 rounded-md border border-green-900 bg-green-950/30 p-4 text-green-300">
       <%= message %>
@@ -10,9 +10,12 @@
     </div>
   <% } %>
 
-  <!-- Gamification Header -->
-  <section class="mb-12 flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
-    <div class="flex items-center gap-8">
+  <style>
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+
+  <section class="mb-12 flex flex-col items-start justify-between gap-6 rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 sm:flex-row sm:items-center">
+    <div class="flex flex-wrap items-center gap-8">
       <div class="flex items-center gap-3">
         <span class="text-3xl">🔥</span>
         <div>
@@ -45,47 +48,91 @@
         </div>
       </div>
     </div>
+
     <div class="text-right">
-      <div class="text-sm font-medium text-zinc-200">Welcome back!</div>
+      <div class="text-sm font-medium text-zinc-200">Welcome back</div>
       <div class="text-xs text-zinc-400"><%= user.name %></div>
     </div>
   </section>
 
-  <section class="mb-16">
-    <h1 class="mb-6 text-3xl font-bold tracking-tight text-zinc-100">What do you want to learn today?</h1>
-    <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-      <% subjects.forEach(subject => { %>
-        <a href="/quiz/<%= encodeURIComponent(subject.name) %>" class="group relative flex flex-col items-center justify-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 text-center transition-all hover:border-zinc-700 hover:bg-zinc-900">
-          <span class="text-3xl"><%= subject.icon %></span>
-          <span class="font-medium text-zinc-200"><%= subject.name %></span>
-        </a>
-      <% }) %>
+  <section class="mb-14">
+    <div class="mb-6 flex items-end justify-between gap-4">
+      <div>
+        <h2 class="text-xl font-semibold text-zinc-100">Resume Learning</h2>
+        <p class="mt-1 text-sm text-zinc-500">Pick up right where you left off.</p>
+      </div>
     </div>
-  </section>
 
-  <section>
-    <h2 class="mb-6 text-xl font-semibold text-zinc-100">My Learning</h2>
-    <% if (courses && courses.length > 0) { %>
+    <% if (resumeCourses && resumeCourses.length) { %>
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <% courses.forEach(course => { %>
-          <a href="/course/<%= course.id %>" class="block rounded-lg border border-zinc-800 bg-zinc-900/30 p-5 transition-colors hover:border-zinc-700 hover:bg-zinc-900/50">
-            <div class="mb-2 flex items-start justify-between">
+        <% resumeCourses.forEach(course => { %>
+          <a href="/course/<%= course.id %>" class="group block rounded-xl border border-zinc-800 bg-zinc-900/30 p-5 transition-all duration-200 hover:-translate-y-1 hover:border-zinc-700 hover:bg-zinc-900/50 hover:shadow-lg hover:shadow-indigo-500/10 active:scale-[0.99]">
+            <div class="mb-2 flex items-start justify-between gap-3">
               <h3 class="font-semibold text-zinc-100"><%= course.topic %></h3>
-              <span class="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-400">
-                <%= course.level || 'Beginner' %>
-              </span>
+              <div class="flex items-center gap-2">
+                <span class="animate-pulse rounded-full border border-indigo-900 bg-indigo-950/40 px-2 py-0.5 text-xs font-medium text-indigo-300">In Progress</span>
+                <span class="rounded-full border border-zinc-800 bg-zinc-950 px-2 py-0.5 text-xs text-zinc-400">
+                  <%= course.level || 'Beginner' %>
+                </span>
+              </div>
             </div>
-            <div class="mt-4 flex items-center justify-between text-sm text-zinc-500">
-              <span>Progress: <%= course.progress || 0 %>%</span>
-              <span><%= new Date(course.created_at).toLocaleDateString() %></span>
+
+            <div class="mt-4 space-y-2">
+              <div class="flex items-center justify-between text-xs text-zinc-500">
+                <span>Modules: <%= course.completedModules %>/<%= course.modulesTotal %></span>
+                <span><%= new Date(course.created_at).toLocaleDateString() %></span>
+              </div>
+              <div class="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+                <div class="h-full rounded-full bg-gradient-to-r from-indigo-500 to-fuchsia-500" style="width: <%= course.progress || 0 %>%"></div>
+              </div>
             </div>
           </a>
         <% }) %>
       </div>
     <% } else { %>
-      <div class="rounded-lg border border-dashed border-zinc-800 p-12 text-center text-zinc-500">
-        No courses yet. Start learning by picking a subject above.
+      <div class="rounded-xl border border-dashed border-zinc-800 bg-zinc-950/20 p-10 text-center text-zinc-500">
+        No active courses yet — start a new subject below.
       </div>
     <% } %>
   </section>
+
+  <section class="mb-14">
+    <div class="mb-6">
+      <h1 class="text-3xl font-bold tracking-tight text-zinc-100">Start New</h1>
+      <p class="mt-2 text-zinc-500">Explore a fresh topic and get a personalized learning map.</p>
+    </div>
+
+    <% if (exploreSubjects && exploreSubjects.length) { %>
+      <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+        <% exploreSubjects.forEach(subject => { %>
+          <a href="/quiz/<%= encodeURIComponent(subject.name) %>" class="group relative flex flex-col items-center justify-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 text-center transition-all duration-200 hover:-translate-y-1 hover:border-zinc-700 hover:bg-zinc-900 hover:shadow-lg hover:shadow-indigo-500/10 active:scale-[0.99]">
+            <span class="text-3xl"><%= subject.icon %></span>
+            <span class="font-medium text-zinc-200"><%= subject.name %></span>
+            <span class="pointer-events-none absolute inset-0 rounded-xl opacity-0 ring-1 ring-indigo-500/20 transition-opacity duration-200 group-hover:opacity-100"></span>
+          </a>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <div class="rounded-xl border border-dashed border-zinc-800 bg-zinc-950/20 p-10 text-center text-zinc-500">
+        You’ve already started every featured subject. Add more subjects in code to expand the Explore list.
+      </div>
+    <% } %>
+  </section>
+
+  <% if (completedCourses && completedCourses.length) { %>
+    <section>
+      <h2 class="mb-4 text-lg font-semibold text-zinc-100">Completed</h2>
+      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <% completedCourses.forEach(course => { %>
+          <a href="/course/<%= course.id %>" class="group block rounded-xl border border-zinc-800 bg-zinc-900/20 p-5 transition-all hover:border-zinc-700 hover:bg-zinc-900/40 active:scale-[0.99]">
+            <div class="mb-2 flex items-start justify-between gap-3">
+              <h3 class="font-semibold text-zinc-100"><%= course.topic %></h3>
+              <span class="rounded-full border border-green-900 bg-green-950/30 px-2 py-0.5 text-xs font-medium text-green-300">Completed ✅</span>
+            </div>
+            <div class="text-xs text-zinc-500">Finished <%= course.modulesTotal %> modules</div>
+          </a>
+        <% }) %>
+      </div>
+    </section>
+  <% } %>
 </div>
