@@ -1,0 +1,51 @@
+<div class="mx-auto max-w-6xl px-6 py-8">
+  <div class="flex items-start justify-between gap-6">
+    <div>
+      <h1 class="text-2xl font-semibold text-zinc-100"><%= course.topic %></h1>
+      <p class="mt-1 text-sm text-zinc-400">Progress: <span class="text-zinc-200"><%= course.progress %>%</span></p>
+    </div>
+    <a href="/dashboard" class="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900">Back to dashboard</a>
+  </div>
+
+  <% if (message) { %>
+    <div class="mt-6 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-200"><%= message %></div>
+  <% } %>
+
+  <div class="mt-8 grid grid-cols-1 gap-4">
+    <% if (!syllabus || syllabus.length === 0) { %>
+      <div class="rounded-xl border border-zinc-800 bg-zinc-950/40 p-5">
+        <h2 class="text-base font-semibold text-zinc-100">No syllabus available</h2>
+        <p class="mt-2 text-sm text-zinc-400">The syllabus JSON could not be parsed.</p>
+      </div>
+    <% } else { %>
+      <% syllabus.forEach(function(m, idx) { %>
+        <div class="rounded-xl border border-zinc-800 bg-zinc-950/40 p-5">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-semibold text-zinc-100"><%= m.title || `Module ${idx + 1}` %></h2>
+            <span class="text-xs text-zinc-500">Module <%= idx + 1 %> / <%= syllabus.length %></span>
+          </div>
+          <p class="mt-2 text-sm text-zinc-400"><%= m.summary || '' %></p>
+
+          <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div class="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+              <p class="text-xs font-semibold tracking-widest text-zinc-400">OBJECTIVES</p>
+              <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-200">
+                <% (m.objectives || []).forEach(function(o) { %>
+                  <li><%= o %></li>
+                <% }) %>
+              </ul>
+            </div>
+            <div class="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+              <p class="text-xs font-semibold tracking-widest text-zinc-400">PRACTICE</p>
+              <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-200">
+                <% (m.practice || []).forEach(function(p) { %>
+                  <li><%= p %></li>
+                <% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    <% } %>
+  </div>
+</div>

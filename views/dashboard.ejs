@@ -1,0 +1,86 @@
+<div class="mx-auto max-w-6xl px-6 py-8">
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold text-zinc-100">Dashboard</h1>
+      <p class="mt-1 text-sm text-zinc-400">Welcome back, <span class="text-zinc-200"><%= user.name %></span>.</p>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <div class="hidden rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-400 sm:block">
+        <span class="text-zinc-500">Signed in as</span> <span class="text-zinc-200"><%= user.email %></span>
+      </div>
+      <form method="POST" action="/logout">
+        <button type="submit" class="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900">Logout</button>
+      </form>
+    </div>
+  </div>
+
+  <% if (error) { %>
+    <div class="mt-6 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-200"><%= error %></div>
+  <% } %>
+  <% if (message) { %>
+    <div class="mt-6 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-200"><%= message %></div>
+  <% } %>
+
+  <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <section class="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-6">
+      <p class="text-xs font-semibold tracking-widest text-zinc-400">NEW ASSESSMENT</p>
+      <h2 class="mt-2 text-base font-semibold text-zinc-100">Generate a quiz</h2>
+      <p class="mt-2 text-sm text-zinc-400">Enter a topic. Gemini will generate 5 questions and then create a personalized 6-module syllabus based on your weak areas.</p>
+
+      <form method="POST" action="/assessments/start" class="mt-5 space-y-3">
+        <div>
+          <label class="block text-sm text-zinc-300">Topic</label>
+          <input
+            name="topic"
+            type="text"
+            required
+            class="mt-2 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-200 placeholder:text-zinc-600 focus:border-indigo-600 focus:outline-none"
+            placeholder="e.g., SQL joins, JavaScript promises, TCP/IP"
+          />
+        </div>
+        <button type="submit" class="w-full rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-500">Generate Quiz</button>
+      </form>
+
+      <div class="mt-5 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+        <p class="text-xs font-semibold tracking-widest text-zinc-400">TIP</p>
+        <p class="mt-2 text-sm text-zinc-400">Be specific ("Indexing and query plans") for a sharper diagnostic.</p>
+      </div>
+    </section>
+
+    <section class="lg:col-span-2">
+      <div class="flex items-center justify-between">
+        <h2 class="text-base font-semibold text-zinc-100">Your courses</h2>
+        <span class="text-sm text-zinc-500"><%= courses.length %> total</span>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <% if (!courses || courses.length === 0) { %>
+          <div class="md:col-span-2 rounded-2xl border border-zinc-800 bg-zinc-950/40 p-6">
+            <h3 class="text-base font-semibold text-zinc-100">No courses yet</h3>
+            <p class="mt-2 text-sm text-zinc-400">Start an assessment to generate your first personalized syllabus.</p>
+          </div>
+        <% } else { %>
+          <% courses.forEach(function(course) { %>
+            <a href="/courses/<%= course.id %>" class="group block rounded-2xl border border-zinc-800 bg-zinc-950/40 p-6 hover:bg-zinc-950">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <h3 class="text-base font-semibold text-zinc-100 group-hover:text-white"><%= course.topic %></h3>
+                  <p class="mt-1 text-sm text-zinc-400">Updated <%= new Date(course.updated_at).toLocaleDateString() %></p>
+                </div>
+                <span class="rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs text-zinc-300"><%= course.progress %>%</span>
+              </div>
+
+              <div class="mt-4">
+                <div class="h-2 w-full rounded-full border border-zinc-800 bg-zinc-950">
+                  <div class="h-full rounded-full bg-indigo-600" style="width: <%= Math.max(0, Math.min(100, course.progress)) %>%;"></div>
+                </div>
+                <p class="mt-3 text-sm text-zinc-400">Open syllabus →</p>
+              </div>
+            </a>
+          <% }) %>
+        <% } %>
+      </div>
+    </section>
+  </div>
+</div>

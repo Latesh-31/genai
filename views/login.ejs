@@ -1,0 +1,38 @@
+<div class="mx-auto grid min-h-[calc(100vh-65px)] max-w-6xl grid-cols-1 gap-0 px-6 py-10 lg:grid-cols-2">
+  <div class="hidden lg:flex lg:flex-col lg:justify-between lg:rounded-2xl lg:border lg:border-zinc-800 lg:bg-zinc-950/40 lg:p-8">
+    <div>
+      <p class="text-xs font-semibold tracking-widest text-zinc-400">ADAPTIVE LEARNING LOOP</p>
+      <h1 class="mt-3 text-3xl font-semibold text-zinc-100">Assess → Diagnose → Personalize</h1>
+      <p class="mt-3 text-sm leading-6 text-zinc-400">Generate a quiz, get graded, and receive a syllabus tailored to your weak areas.</p>
+    </div>
+    <div class="text-xs text-zinc-500">Built as a single monolithic Node.js app (Express + EJS + MySQL).</div>
+  </div>
+
+  <div class="flex items-center">
+    <div class="w-full rounded-2xl border border-zinc-800 bg-zinc-950/40 p-6 lg:ml-10">
+      <h2 class="text-xl font-semibold text-zinc-100">Login</h2>
+      <p class="mt-1 text-sm text-zinc-400">Continue your learning dashboard.</p>
+
+      <% if (error) { %>
+        <div class="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-200"><%= error %></div>
+      <% } %>
+      <% if (message) { %>
+        <div class="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-200"><%= message %></div>
+      <% } %>
+
+      <form method="POST" action="/login" class="mt-6 space-y-4">
+        <div>
+          <label class="block text-sm text-zinc-300">Email</label>
+          <input name="email" type="email" required class="mt-2 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-200 placeholder:text-zinc-600 focus:border-indigo-600 focus:outline-none" placeholder="you@company.com" />
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-300">Password</label>
+          <input name="password" type="password" required class="mt-2 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-200 placeholder:text-zinc-600 focus:border-indigo-600 focus:outline-none" placeholder="••••••••" />
+        </div>
+        <button type="submit" class="w-full rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-500">Sign in</button>
+      </form>
+
+      <p class="mt-6 text-sm text-zinc-400">New here? <a href="/register" class="text-zinc-200 underline underline-offset-4 hover:text-white">Create an account</a>.</p>
+    </div>
+  </div>
+</div>
