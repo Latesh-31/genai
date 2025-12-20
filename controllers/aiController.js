@@ -139,6 +139,73 @@ async function gradeQuiz(topic, quiz, userAnswers) {
   };
 }
 
+function clampNumber(value, min, max) {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, value));
+}
+
+function buildFallbackExitQuiz(module) {
+  const topics = Array.isArray(module?.topics) ? module.topics : [];
+  const seed = topics.slice(0, 3);
+  const promptTopic = seed[0] || module?.title || 'this module';
+
+  return Array.from({ length: 3 }).map((_, idx) => {
+    const focus = seed[idx] || promptTopic;
+
+    return {
+      question: `Quick check: which option best matches the key idea of "${focus}"?`,
+      options: [
+        `The core definition/concept of ${focus}`,
+        `An unrelated idea that sounds similar`,
+        `A common misconception about ${focus}`,
+        `A detail that is true but not the main idea`
+      ],
+      correctIndex: 0,
+      review_topic: focus,
+      explanation: `If you missed this, re-read the section covering ${focus} and try to explain it in your own words.`
+    };
+  });
+}
+
+function normalizeExitQuiz(exitQuiz, module) {
+  if (!Array.isArray(exitQuiz) || exitQuiz.length !== 3) {
+    return buildFallbackExitQuiz(module);
+  }
+
+  const normalized = exitQuiz
+    .map((q) => {
+      const options = Array.isArray(q?.options) ? q.options.filter((o) => typeof o === 'string') : [];
+      const correctIndex = Number.isInteger(q?.correctIndex) ? q.correctIndex : 0;
+
+      if (typeof q?.question !== 'string' || !q.question.trim() || options.length !== 4 || correctIndex < 0 || correctIndex > 3) {
+        return null;
+      }
+
+      return {
+        question: q.question.trim(),
+        options,
+        correctIndex,
+        review_topic: typeof q.review_topic === 'string' ? q.review_topic.trim() : '',
+        explanation: typeof q.explanation === 'string' ? q.explanation.trim() : ''
+      };
+    })
+    .filter(Boolean);
+
+  if (normalized.length !== 3) {
+    return buildFallbackExitQuiz(module);
+  }
+
+  return normalized;
+}
+
+function computeDefaultNodePosition(idx, total) {
+  const t = total > 1 ? idx / (total - 1) : 0;
+  const y = clampNumber(12 + t * 76, 0, 100);
+  const x = idx % 2 === 0 ? 24 : 76;
+
+  return { x, y };
+}
+
 async function evaluateAndCreateSyllabus(subject, userAnswers, quizQuestions) {
   // 1. Grade the quiz
   const gradingResult = await gradeQuiz(subject, quizQuestions, userAnswers);
@@ -155,15 +222,21 @@ async function evaluateAndCreateSyllabus(subject, userAnswers, quizQuestions) {
     '',
     'Create a 6-module syllabus.',
     'If score is low (0-2), start with basics/fundamentals. If score is high (4-5), skip to advanced topics.',
+    '',
     'Each module must be an object with:',
     '- title (string)',
     '- description (string)',
     '- topics (array of strings - subtopics to cover)',
+    '- node (object with x,y numbers 0..100 for a mind-map layout; OPTIONAL but preferred)',
+    '- exit_quiz (array of EXACTLY 3 multiple-choice questions to unlock the next module)',
+    '',
+    'Exit quiz question shape:',
+    '{ "question": "...", "options": ["...", "...", "...", "..."], "correctIndex": 0, "review_topic": "...", "explanation": "..." }',
     '',
     'JSON shape:',
     '{',
     '  "syllabus": [',
-    '    { "title": "...", "description": "...", "topics": ["...", "..."] }',
+    '    { "title": "...", "description": "...", "topics": ["...", "..."], "node": { "x": 50, "y": 20 }, "exit_quiz": [ ... ] }',
     '  ],',
     '  "level": "Beginner | Intermediate | Advanced"',
     '}',
@@ -177,14 +250,28 @@ async function evaluateAndCreateSyllabus(subject, userAnswers, quizQuestions) {
     throw new Error('AI syllabus must be an array of exactly 6 modules inside "syllabus" property');
   }
 
-  // Sanitize
+  // Sanitize + enrich with mind-map metadata
+  const totalModules = parsed.syllabus.length;
+
   parsed.syllabus.forEach((m, idx) => {
-      m.title = m.title || `Module ${idx+1}`;
-      m.description = m.description || '';
-      m.topics = Array.isArray(m.topics) ? m.topics : [];
+    m.title = m.title || `Module ${idx + 1}`;
+    m.description = m.description || '';
+    m.topics = Array.isArray(m.topics) ? m.topics.filter((t) => typeof t === 'string' && t.trim()) : [];
+
+    const rawNode = m.node && typeof m.node === 'object' ? m.node : null;
+    const x = rawNode ? Number(rawNode.x) : NaN;
+    const y = rawNode ? Number(rawNode.y) : NaN;
+
+    const defaultNode = computeDefaultNodePosition(idx, totalModules);
+    m.node = {
+      x: clampNumber(Number.isFinite(x) ? x : defaultNode.x, 0, 100),
+      y: clampNumber(Number.isFinite(y) ? y : defaultNode.y, 0, 100)
+    };
+
+    m.exit_quiz = normalizeExitQuiz(m.exit_quiz, m);
   });
-  
-  const level = parsed.level || (score < 3 ? 'Beginner' : (score < 5 ? 'Intermediate' : 'Advanced'));
+
+  const level = parsed.level || (score < 3 ? 'Beginner' : score < 5 ? 'Intermediate' : 'Advanced');
 
   return {
     syllabus: parsed.syllabus,

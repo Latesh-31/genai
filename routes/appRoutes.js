@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const aiController = require('../controllers/aiController');
+const appController = require('../controllers/appController');
 const { query } = require('../config/database');
 
 function asyncHandler(fn) {
@@ -17,30 +18,7 @@ function requireAuth(req, res, next) {
 }
 
 // GET /dashboard
-router.get('/dashboard', requireAuth, asyncHandler(async (req, res) => {
-  const subjects = [
-    { name: 'Python', icon: '🐍' },
-    { name: 'React', icon: '⚛️' },
-    { name: 'History', icon: '📜' },
-    { name: 'Physics', icon: '🔭' },
-    { name: 'JavaScript', icon: '💻' },
-    { name: 'SQL', icon: '🗄️' },
-    { name: 'Machine Learning', icon: '🤖' },
-    { name: 'System Design', icon: '🏗️' }
-  ];
-
-  const courses = await query(
-    'SELECT id, topic, progress, level, created_at FROM courses WHERE user_id = ? ORDER BY id DESC',
-    [req.session.user.id]
-  );
-
-  res.render('dashboard', {
-    title: 'Dashboard',
-    subjects,
-    courses,
-    user: req.session.user
-  });
-}));
+router.get('/dashboard', requireAuth, asyncHandler(appController.getDashboard));
 
 // GET /quiz/:subject
 router.get('/quiz/:subject', requireAuth, asyncHandler(async (req, res) => {
@@ -80,27 +58,63 @@ router.post('/quiz/submit', requireAuth, asyncHandler(async (req, res) => {
   });
 
   try {
-    const result = await aiController.evaluateAndCreateSyllabus(subject, userAnswers, quiz);
-    const { syllabus, level, grading } = result;
+    const grading = await aiController.gradeQuiz(subject, quiz, userAnswers);
 
-    const courseResult = await query(
-      'INSERT INTO courses (user_id, topic, syllabus_json, progress, level) VALUES (?, ?, ?, ?, ?)',
-      [req.session.user.id, subject, JSON.stringify(syllabus), 0, level]
+    const analysis = quiz.map((q, idx) => {
+      const selectedIndex = Number.isInteger(userAnswers[idx]) ? userAnswers[idx] : -1;
+      const correctIndex = Number.isInteger(q.correctIndex) ? q.correctIndex : 0;
+      const selected = selectedIndex >= 0 ? q.options?.[selectedIndex] : null;
+      const correctAnswer = q.options?.[correctIndex] || null;
+
+      const pq = Array.isArray(grading.per_question)
+        ? grading.per_question.find((p) => Number(p.index) === idx)
+        : null;
+
+      return {
+        index: idx,
+        question: q.question,
+        selectedIndex,
+        selected,
+        correctIndex,
+        correctAnswer,
+        correct: selectedIndex === correctIndex,
+        weak_topic: typeof q.weak_topic === 'string' ? q.weak_topic : null,
+        note: pq && typeof pq.note === 'string' ? pq.note : ''
+      };
+    });
+
+    const assessmentResult = await query(
+      'INSERT INTO assessments (user_id, topic, score, feedback_text, analysis_json) VALUES (?, ?, ?, ?, ?)',
+      [req.session.user.id, subject, grading.score, grading.feedback_text, JSON.stringify(analysis)]
     );
 
-    // Save assessment record as well
-    await query(
-      'INSERT INTO assessments (user_id, topic, score, feedback_text) VALUES (?, ?, ?, ?)',
-      [req.session.user.id, subject, grading.score, grading.feedback_text]
-    );
+    req.session.currentAssessment = {
+      ...current,
+      userAnswers,
+      grading,
+      assessmentId: assessmentResult.insertId
+    };
 
-    delete req.session.currentAssessment;
-    res.redirect(`/course/${courseResult.insertId}`);
+    const scoreOutOf100 = Math.round((grading.score / 5) * 100);
+    const levelBadge = scoreOutOf100 < 60 ? 'Apprentice' : 'Adept';
+
+    res.render('report', {
+      title: `Report: ${subject}`,
+      subject,
+      grading,
+      analysis,
+      scoreOutOf100,
+      levelBadge,
+      assessmentId: assessmentResult.insertId
+    });
   } catch (err) {
     console.error(err);
-    res.redirect('/dashboard?error=' + encodeURIComponent('Failed to process quiz results.'));
+    res.redirect('/dashboard?error=' + encodeURIComponent(err.message || 'Failed to process quiz results.'));
   }
 }));
+
+// POST /assessment/:id/generate-map
+router.post('/assessment/:id/generate-map', requireAuth, asyncHandler(appController.generateMapFromAssessment));
 
 // GET /course/:id
 router.get('/course/:id', requireAuth, asyncHandler(async (req, res) => {
@@ -136,11 +150,22 @@ router.get('/course/:id/lesson/:moduleIndex/:topicIndex', requireAuth, asyncHand
   }
 
   const course = rows[0];
-  const syllabus = JSON.parse(course.syllabus_json);
+  let syllabus = [];
+  try {
+    syllabus = JSON.parse(course.syllabus_json);
+  } catch (_) {
+    syllabus = [];
+  }
+
   const modIdx = parseInt(moduleIndex, 10);
   const topIdx = parseInt(topicIndex, 10);
 
-  if (!syllabus[modIdx] || !syllabus[modIdx].topics[topIdx]) {
+  const unlockedThroughModule = Number.isInteger(course.completed_modules) ? course.completed_modules : 0;
+  if (modIdx > unlockedThroughModule) {
+    return res.status(403).json({ error: 'This module is locked. Pass the exit quiz to unlock it.' });
+  }
+
+  if (!syllabus[modIdx] || !syllabus[modIdx].topics || !syllabus[modIdx].topics[topIdx]) {
     return res.status(404).json({ error: 'Topic not found' });
   }
 
@@ -163,9 +188,14 @@ router.post('/course/:id/complete', requireAuth, asyncHandler(async (req, res) =
   }
 
   const course = courseRows[0];
-  const syllabus = JSON.parse(course.syllabus_json);
+  let syllabus = [];
+  try {
+    syllabus = JSON.parse(course.syllabus_json);
+  } catch (_) {
+    syllabus = [];
+  }
 
-  if (!syllabus[moduleIndex] || !syllabus[moduleIndex].topics[topicIndex]) {
+  if (!syllabus[moduleIndex] || !syllabus[moduleIndex].topics || !syllabus[moduleIndex].topics[topicIndex]) {
     return res.status(404).json({ error: 'Topic not found' });
   }
 
@@ -182,25 +212,38 @@ router.post('/course/:id/complete', requireAuth, asyncHandler(async (req, res) =
       [userId, courseId, moduleIndex, topicIndex, xpEarned]
     );
 
-    // Update user's total XP and streak
-    await query('UPDATE users SET total_xp = total_xp + ?, last_lesson_date = CURRENT_DATE WHERE id = ?', [xpEarned, userId]);
-
-    // Update streak (simplified logic - would need more sophisticated date checking in production)
+    // Update user's total XP + streak
+    const todayStr = new Date().toISOString().split('T')[0];
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    
     const yesterdayStr = yesterday.toISOString().split('T')[0];
-    const userRows = await query('SELECT last_lesson_date FROM users WHERE id = ?', [userId]);
-    
-    if (userRows[0].last_lesson_date === yesterdayStr) {
-      await query('UPDATE users SET streak_days = streak_days + 1 WHERE id = ?', [userId]);
-    } else if (!userRows[0].last_lesson_date || userRows[0].last_lesson_date < yesterdayStr) {
-      await query('UPDATE users SET streak_days = 1 WHERE id = ?', [userId]);
+
+    const userRows = await query('SELECT last_lesson_date, streak_days FROM users WHERE id = ? LIMIT 1', [userId]);
+    const lastLessonDate = userRows[0]?.last_lesson_date || null;
+    const currentStreak = Number(userRows[0]?.streak_days || 0);
+
+    let nextStreak = currentStreak;
+    if (lastLessonDate === todayStr) {
+      nextStreak = currentStreak;
+    } else if (lastLessonDate === yesterdayStr) {
+      nextStreak = currentStreak + 1;
+    } else {
+      nextStreak = 1;
     }
+
+    await query('UPDATE users SET total_xp = total_xp + ?, last_lesson_date = ?, streak_days = ? WHERE id = ?', [
+      xpEarned,
+      todayStr,
+      nextStreak,
+      userId
+    ]);
   }
 
   res.json({ success: true, xpEarned  });
 }));
+
+// POST /course/:id/verify-module
+router.post('/course/:id/verify-module', requireAuth, asyncHandler(appController.verifyModuleMastery));
 
 // POST /course/:id/tutor
 router.post('/course/:id/tutor', requireAuth, asyncHandler(async (req, res) => {

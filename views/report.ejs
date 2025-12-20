@@ -1,0 +1,112 @@
+<div class="mx-auto max-w-4xl px-6 py-12 opacity-0 animate-[fadeIn_.45s_ease-out_forwards]">
+  <style>
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+
+  <div class="mb-8">
+    <a href="/dashboard" class="text-sm text-zinc-500 hover:text-zinc-300">&larr; Back to Dashboard</a>
+    <h1 class="mt-4 text-3xl font-bold text-zinc-100">First Impression Report</h1>
+    <p class="mt-2 text-zinc-400">Topic: <span class="font-medium text-zinc-200"><%= subject %></span></p>
+  </div>
+
+  <section class="grid gap-6 md:grid-cols-3">
+    <div class="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 md:col-span-2">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div class="text-xs font-semibold tracking-widest text-zinc-400">SCORE</div>
+          <div class="mt-2 text-6xl font-black tracking-tight text-zinc-100"><%= scoreOutOf100 %><span class="text-zinc-500">/100</span></div>
+          <div class="mt-2 text-sm text-zinc-500">(<%= grading.score %>/5 questions correct)</div>
+        </div>
+
+        <div class="flex flex-col items-end gap-2">
+          <span class="rounded-full border border-indigo-900 bg-indigo-950/40 px-3 py-1 text-sm font-semibold text-indigo-200">
+            <%= levelBadge %>
+          </span>
+          <span class="text-xs text-zinc-500">Your starting level</span>
+        </div>
+      </div>
+
+      <% if (grading.feedback_text) { %>
+        <div class="mt-6 rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
+          <div class="text-xs font-semibold tracking-widest text-zinc-400">COACHING NOTE</div>
+          <div class="mt-2 text-sm text-zinc-200"><%= grading.feedback_text %></div>
+        </div>
+      <% } %>
+
+      <div class="mt-6 flex flex-wrap items-center gap-3">
+        <form method="POST" action="/assessment/<%= assessmentId %>/generate-map">
+          <button type="submit" class="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition-all hover:bg-indigo-500 active:scale-95">
+            Generate My Personalized Map
+          </button>
+        </form>
+
+        <a href="/quiz/<%= encodeURIComponent(subject) %>" class="rounded-xl border border-zinc-800 bg-zinc-950/40 px-5 py-3 text-sm font-semibold text-zinc-200 transition-all hover:bg-zinc-900 active:scale-95">
+          Retake Assessment
+        </a>
+      </div>
+    </div>
+
+    <div class="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
+      <div class="text-xs font-semibold tracking-widest text-zinc-400">WEAK TOPICS</div>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <% const weak = Array.isArray(grading.weak_topics) ? grading.weak_topics : []; %>
+        <% if (weak.length) { %>
+          <% weak.slice(0, 8).forEach(t => { %>
+            <span class="rounded-full border border-zinc-800 bg-zinc-950/50 px-3 py-1 text-xs text-zinc-300"><%= t %></span>
+          <% }) %>
+        <% } else { %>
+          <div class="text-sm text-zinc-500">No major weak spots detected.</div>
+        <% } %>
+      </div>
+    </div>
+  </section>
+
+  <section class="mt-10">
+    <h2 class="text-xl font-semibold text-zinc-100">Mistake Analysis</h2>
+    <p class="mt-1 text-sm text-zinc-500">Specific misses and what to review next.</p>
+
+    <% const wrong = (analysis || []).filter(a => !a.correct); %>
+
+    <% if (!wrong.length) { %>
+      <div class="mt-6 rounded-xl border border-green-900 bg-green-950/20 p-6 text-green-200">
+        Perfect score — you’re ready for advanced material. ✅
+      </div>
+    <% } else { %>
+      <div class="mt-6 space-y-4">
+        <% wrong.forEach(item => { %>
+          <div class="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <div class="text-xs font-semibold tracking-widest text-zinc-400">QUESTION <%= item.index + 1 %></div>
+                <div class="mt-2 text-sm font-medium text-zinc-100"><%= item.question %></div>
+              </div>
+              <span class="rounded-full border border-red-900 bg-red-950/30 px-3 py-1 text-xs font-semibold text-red-200">Missed</span>
+            </div>
+
+            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+              <div class="rounded-lg border border-zinc-800 bg-zinc-950/40 p-4">
+                <div class="text-xs font-semibold text-zinc-400">Your Answer</div>
+                <div class="mt-1 text-sm text-zinc-200"><%= item.selected || '—' %></div>
+              </div>
+              <div class="rounded-lg border border-zinc-800 bg-zinc-950/40 p-4">
+                <div class="text-xs font-semibold text-zinc-400">Correct Answer</div>
+                <div class="mt-1 text-sm text-green-200"><%= item.correctAnswer || '—' %></div>
+              </div>
+            </div>
+
+            <% if (item.note) { %>
+              <div class="mt-4 rounded-lg border border-zinc-800 bg-zinc-950/40 p-4">
+                <div class="text-xs font-semibold text-zinc-400">Why?</div>
+                <div class="mt-1 text-sm text-zinc-200"><%= item.note %></div>
+              </div>
+            <% } %>
+
+            <% if (item.weak_topic) { %>
+              <div class="mt-4 text-xs text-zinc-500">Suggested review: <span class="text-zinc-300"><%= item.weak_topic %></span></div>
+            <% } %>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </section>
+</div>
