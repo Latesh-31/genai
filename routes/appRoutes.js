@@ -132,7 +132,7 @@ router.get('/course/:id/lesson/:moduleIndex/:topicIndex', requireAuth, asyncHand
   
   const rows = await query('SELECT * FROM courses WHERE id = ? AND user_id = ?', [id, req.session.user.id]);
   if (!rows.length) {
-    return res.status(404).send('Course not found');
+    return res.status(404).json({ error: 'Course not found' });
   }
 
   const course = rows[0];
@@ -141,18 +141,65 @@ router.get('/course/:id/lesson/:moduleIndex/:topicIndex', requireAuth, asyncHand
   const topIdx = parseInt(topicIndex, 10);
 
   if (!syllabus[modIdx] || !syllabus[modIdx].topics[topIdx]) {
-    return res.status(404).send('Topic not found');
+    return res.status(404).json({ error: 'Topic not found' });
   }
 
   const topicName = syllabus[modIdx].topics[topIdx];
   const lessonContent = await aiController.generateLesson(topicName, course.level);
 
-  // Return partial HTML or JSON. 
-  // Since the UI will likely use fetch to load this into the right pane:
-  res.json({
-    topic: topicName,
-    content: lessonContent
-  });
+  res.json(lessonContent);
+}));
+
+// POST /course/:id/complete - Track lesson completion and award XP
+router.post('/course/:id/complete', requireAuth, asyncHandler(async (req, res) => {
+  const courseId = parseInt(req.params.id, 10);
+  const userId = req.session.user.id;
+  const { moduleIndex, topicIndex, xpEarned = 100 } = req.body;
+
+  // Verify course ownership
+  const courseRows = await query('SELECT * FROM courses WHERE id = ? AND user_id = ?', [courseId, userId]);
+  if (!courseRows.length) {
+    return res.status(404).json({ error: 'Course not found' });
+  }
+
+  const course = courseRows[0];
+  const syllabus = JSON.parse(course.syllabus_json);
+
+  if (!syllabus[moduleIndex] || !syllabus[moduleIndex].topics[topicIndex]) {
+    return res.status(404).json({ error: 'Topic not found' });
+  }
+
+  // Check if lesson was already completed
+  const completedRows = await query(
+    'SELECT id FROM lesson_completions WHERE user_id = ? AND course_id = ? AND module_index = ? AND topic_index = ?',
+    [userId, courseId, moduleIndex, topicIndex]
+  );
+
+  if (!completedRows.length) {
+    // Insert lesson completion
+    await query(
+      'INSERT INTO lesson_completions (user_id, course_id, module_index, topic_index, xp_earned) VALUES (?, ?, ?, ?, ?)',
+      [userId, courseId, moduleIndex, topicIndex, xpEarned]
+    );
+
+    // Update user's total XP and streak
+    await query('UPDATE users SET total_xp = total_xp + ?, last_lesson_date = CURRENT_DATE WHERE id = ?', [xpEarned, userId]);
+
+    // Update streak (simplified logic - would need more sophisticated date checking in production)
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const userRows = await query('SELECT last_lesson_date FROM users WHERE id = ?', [userId]);
+    
+    if (userRows[0].last_lesson_date === yesterdayStr) {
+      await query('UPDATE users SET streak_days = streak_days + 1 WHERE id = ?', [userId]);
+    } else if (!userRows[0].last_lesson_date || userRows[0].last_lesson_date < yesterdayStr) {
+      await query('UPDATE users SET streak_days = 1 WHERE id = ?', [userId]);
+    }
+  }
+
+  res.json({ success: true, xpEarned  });
 }));
 
 // POST /course/:id/tutor
