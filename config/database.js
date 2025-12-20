@@ -24,6 +24,9 @@ async function initializeDB() {
         name TEXT, 
         email TEXT UNIQUE, 
         password TEXT,
+        total_xp INTEGER DEFAULT 0,
+        streak_days INTEGER DEFAULT 0,
+        last_lesson_date TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`
     },
@@ -36,6 +39,7 @@ async function initializeDB() {
         level TEXT,
         syllabus_json TEXT, 
         progress INTEGER DEFAULT 0,
+        completed_modules INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`
     },
@@ -47,7 +51,22 @@ async function initializeDB() {
         topic TEXT, 
         score INTEGER, 
         feedback_text TEXT,
+        analysis_json TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`
+    },
+    {
+      name: 'lesson_completions',
+      sql: `CREATE TABLE IF NOT EXISTS lesson_completions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        user_id INTEGER, 
+        course_id INTEGER, 
+        module_index INTEGER, 
+        topic_index INTEGER,
+        xp_earned INTEGER DEFAULT 100,
+        completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (course_id) REFERENCES courses(id)
       )`
     }
   ];

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS courses (
   topic VARCHAR(255) NOT NULL,
   syllabus_json JSON NOT NULL,
   progress INT NOT NULL DEFAULT 0,
+  completed_modules INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_courses_user_id (user_id),
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS assessments (
   topic VARCHAR(255) NOT NULL,
   score INT NOT NULL,
   feedback_text TEXT,
+  analysis_json JSON,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_assessments_user_id (user_id),
   CONSTRAINT fk_assessments_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

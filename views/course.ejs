@@ -1,5 +1,5 @@
 <div class="flex h-[calc(100vh-65px)] overflow-hidden">
-  <!-- Sidebar -->
+  <!-- Sidebar - Mind Map Syllabus -->
   <aside class="w-80 flex-shrink-0 overflow-y-auto border-r border-zinc-800 bg-zinc-950 p-6">
     <div class="mb-6">
       <a href="/dashboard" class="mb-4 inline-block text-xs text-zinc-500 hover:text-zinc-300">&larr; Dashboard</a>
@@ -12,15 +12,91 @@
       </div>
     </div>
 
+    <!-- Mind Map Visualization -->
+    <div class="mb-6 rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
+      <h3 class="mb-4 text-sm font-semibold text-zinc-100">🗺️ Learning Journey Map</h3>
+      
+      <div class="mind-map-grid grid grid-cols-3 gap-3">
+        <% syllabus.forEach((module, mIdx) => { %>
+          <% 
+            // Determine module state
+            const isCurrent = mIdx === 0; // Simplified for now
+            const isCompleted = mIdx < (course.completed_modules || 0);
+            const isLocked = mIdx > (course.completed_modules || 0);
+          %>
+          
+          <div class="relative flex flex-col items-center">
+            <!-- Module Node -->
+            <div class="relative z-10 flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 text-center transition-all 
+              <% if (isCompleted) { %>border-green-500 bg-green-950/30 text-green-300<% } 
+              else if (isCurrent) { %>border-indigo-500 bg-indigo-950/30 text-indigo-300 animate-pulse<% } 
+              else if (isLocked) { %>border-zinc-700 bg-zinc-800 text-zinc-500 opacity-60<% } 
+              else { %>border-zinc-700 bg-zinc-800 text-zinc-400<% } %>">
+              <span class="text-xs font-bold"><%= mIdx + 1 %></span>
+              <% if (isCompleted) { %>
+                <span class="text-xs">✅</span>
+              <% } else if (isLocked) { %>
+                <span class="text-xs">🔒</span>
+              <% } else { %>
+                <span class="text-xs">📚</span>
+              <% } %>
+            </div>
+            
+            <!-- Module Title -->
+            <div class="mt-2 text-center">
+              <span class="text-xs font-medium 
+                <% if (isCompleted) { %>text-green-400<% } 
+                else if (isCurrent) { %>text-indigo-400<% } 
+                else if (isLocked) { %>text-zinc-600<% } 
+                else { %>text-zinc-400<% } %>">
+                <%= module.title.substring(0, 15) %><% if (module.title.length > 15) { %>...<% } %>
+              </span>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+      
+      <!-- Connections between nodes -->
+      <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <svg class="h-full w-full" fill="none" stroke="currentColor" stroke-width="1">
+          <% for (let i = 0; i < syllabus.length - 1; i++) { %>
+            <line x1="<%= 20 + (i % 3) * 100 %>" y1="<%= 60 + Math.floor(i / 3) * 80 %>"
+                  x2="<%= 20 + ((i + 1) % 3) * 100 %>" y2="<%= 60 + Math.floor((i + 1) / 3) * 80 %>"
+                  class="stroke-zinc-700 transition-all 
+                    <% if (i < (course.completed_modules || 0)) { %>stroke-green-500<% } 
+                    else if (i === (course.completed_modules || 0)) { %>stroke-indigo-500<% } 
+                    else { %>stroke-zinc-700<% } %>" />
+          <% } %>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Traditional Module List -->
     <div class="space-y-6">
       <% syllabus.forEach((module, mIdx) => { %>
+        <% 
+          const isCurrentModule = mIdx === 0; // Simplified
+          const isLocked = mIdx > (course.completed_modules || 0);
+          const isCompleted = mIdx < (course.completed_modules || 0);
+        %>
+        
         <div class="relative pl-4">
           <!-- Timeline line -->
-          <div class="absolute left-0 top-2 h-full w-0.5 bg-zinc-800"></div>
+          <div class="absolute left-0 top-2 h-full w-0.5 
+            <% if (isCompleted) { %>bg-green-500<% } 
+            else if (isCurrentModule) { %>bg-indigo-500<% } 
+            else { %>bg-zinc-800<% } %>"></div>
           
           <h3 class="relative mb-2 text-sm font-semibold text-zinc-200">
-            <span class="absolute -left-[21px] top-0.5 h-3 w-3 rounded-full border-2 border-zinc-950 bg-zinc-700"></span>
+            <span class="absolute -left-[21px] top-0.5 h-3 w-3 rounded-full border-2 border-zinc-950 
+              <% if (isCompleted) { %>bg-green-500<% } 
+              else if (isCurrentModule) { %>bg-indigo-500 animate-pulse<% } 
+              else if (isLocked) { %>bg-zinc-700<% } 
+              else { %>bg-zinc-700<% } %>"></span>
             <%= module.title %>
+            <% if (isLocked) { %>
+              <span class="ml-2 rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">🔒 Locked</span>
+            <% } %>
           </h3>
           <p class="mb-3 text-xs text-zinc-500"><%= module.description %></p>
           
@@ -28,15 +104,33 @@
             <% module.topics.forEach((topic, tIdx) => { %>
               <li>
                 <button 
-                  onclick="loadLesson('<%= course.id %>', <%= mIdx %>, <%= tIdx %>)"
-                  class="w-full rounded px-2 py-1.5 text-left text-sm text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-200 focus:bg-zinc-900 focus:text-zinc-100 focus:outline-none"
+                  onclick="<%= isLocked ? 'showLockedModuleAlert()' : `loadLesson(${course.id}, ${mIdx}, ${tIdx})` %>"
+                  class="w-full rounded px-2 py-1.5 text-left text-sm transition-colors 
+                    <% if (isLocked) { %>
+                      cursor-not-allowed text-zinc-600 hover:bg-zinc-900 hover:text-zinc-600
+                    <% } else { %>
+                      text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 focus:bg-zinc-900 focus:text-zinc-100 focus:outline-none
+                    <% } %>"
                   id="btn-<%= mIdx %>-<%= tIdx %>"
-                >
+                  <%= isLocked ? 'disabled' : '' %>>
                   <%= topic %>
+                  <% if (isLocked) { %>
+                    <span class="ml-1 text-xs">🔒</span>
+                  <% } %>
                 </button>
               </li>
             <% }) %>
           </ul>
+          
+          <% if (!isLocked && mIdx > 0 && mIdx === (course.completed_modules || 0)) { %>
+            <div class="mt-3">
+              <button 
+                onclick="takeExitQuiz(<%= course.id %>, <%= mIdx - 1 %>)"
+                class="w-full rounded border border-indigo-600 bg-indigo-600/10 px-3 py-1.5 text-xs text-indigo-300 transition-colors hover:bg-indigo-600/20">
+                🎯 Take Exit Quiz to Unlock
+              </button>
+            </div>
+          <% } %>
         </div>
       <% }) %>
     </div>
@@ -112,7 +206,7 @@
         </div>
       </div>
 
-      <!-- AI Tutor Panel (kept from original) -->
+      <!-- AI Tutor Panel -->
       <section id="tutor-section" class="hidden absolute bottom-0 left-0 right-0 border-t border-zinc-800 bg-zinc-950/95 p-6 backdrop-blur-sm">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h2 class="text-sm font-semibold text-zinc-200">AI Tutor</h2>
@@ -190,16 +284,60 @@
   </main>
 </div>
 
+<!-- Exit Quiz Modal -->
+<div id="exit-quiz-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-zinc-900/80 backdrop-blur-sm">
+  <div class="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+    <div class="mb-4 flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-zinc-100">🎯 Module Exit Quiz</h2>
+      <button onclick="closeExitQuizModal()" class="text-zinc-400 hover:text-zinc-200">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6 6 18" />
+          <path d="M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+    
+    <p class="mb-4 text-sm text-zinc-400">Answer these questions to unlock the next module. You need to score at least 66% to pass.</p>
+    
+    <div id="exit-quiz-questions" class="space-y-4"></div>
+    
+    <div class="mt-6 flex justify-end gap-2">
+      <button onclick="closeExitQuizModal()" class="rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700">
+        Cancel
+      </button>
+      <button onclick="submitExitQuiz()" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-500">
+        Submit Quiz
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Quiz Result Modal -->
+<div id="quiz-result-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-zinc-900/80 backdrop-blur-sm">
+  <div class="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-950 p-6 text-center">
+    <div id="quiz-result-content"></div>
+    
+    <div class="mt-6 flex justify-center gap-2">
+      <button onclick="closeQuizResultModal()" class="rounded-lg bg-indigo-600 px-6 py-2 text-white hover:bg-indigo-500">
+        Continue
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Confetti Canvas -->
 <canvas id="confetti-canvas" class="pointer-events-none fixed inset-0 z-50 hidden"></canvas>
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
   const COURSE_ID = <%= Number(course.id) %>;
+  const COMPLETED_MODULES = <%= course.completed_modules || 0 %>;
   
   let currentLesson = null;
   let currentCardIndex = 0;
   let lessonProgress = { completed: false };
+  let currentExitQuiz = null;
+  let currentModuleIndex = null;
 
   // Card rendering functions
   function renderTextCard(card) {
@@ -268,12 +406,7 @@
     progressBar.style.width = `${percentage}%`;
   }
 
-  function selectQuizCard(card, index) {
-    const selectedCard = card;
-  }
-}
-
-function refreshCard() {
+  function refreshCard() {
     const prevBtn = document.getElementById('prev-btn');
     const nextBtn = document.getElementById('next-btn');
     const cardContent = document.getElementById('card-content');
@@ -351,9 +484,9 @@ function refreshCard() {
     }
     
     feedback.classList.remove('hidden');
-}
+  }
 
-function completeLesson() {
+  function completeLesson() {
     const completionCelebration = document.getElementById('completion-celebration');
     completionCelebration.classList.remove('hidden');
     
@@ -365,20 +498,20 @@ function completeLesson() {
     
     // Award XP (this would be sent to the server)
     awardExperiencePoints(100);
-}
+  }
 
-function awardExperiencePoints(points) {
+  function awardExperiencePoints(points) {
     // Send to server to update user's XP
     fetch(`/course/${COURSE_ID}/complete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-		  body: JSON.stringify({
-	   	  xpEarned: grade.progress.totalPoints
-    })
-  }).catch(err => console.error('Failed to award XP:', err));
-}
+      body: JSON.stringify({
+        xpEarned: points
+      })
+    }).catch(err => console.error('Failed to award XP:', err));
+  }
 
-function closeLesson() {
+  function closeLesson() {
     const emptyState = document.getElementById('empty-state');
     
     document.getElementById('card-deck').classList.add('hidden');
@@ -386,9 +519,9 @@ function closeLesson() {
     
     currentLesson = null;
     currentCardIndex = 0;
-}
+  }
 
-async function loadLesson(courseId, moduleIdx, topicIdx) {
+  async function loadLesson(courseId, moduleIdx, topicIdx) {
     const emptyState = document.getElementById('empty-state');
     const loadingState = document.getElementById('loading-state');
     const cardDeck = document.getElementById('card-deck');
@@ -411,7 +544,7 @@ async function loadLesson(courseId, moduleIdx, topicIdx) {
     const activeBtn = document.getElementById(`btn-${moduleIdx}-${topicIdx}`);
     if (activeBtn) {
       activeBtn.classList.add('bg-zinc-800', 'text-zinc-100', 'font-medium');
-      btn.classList.remove('text-zinc-400');
+      activeBtn.classList.remove('text-zinc-400');
     }
     
     try {
@@ -442,6 +575,120 @@ async function loadLesson(courseId, moduleIdx, topicIdx) {
       emptyState.querySelector('h2').textContent = 'Error loading lesson';
       emptyState.querySelector('p').textContent = 'Please try again.';
     }
+  }
+
+  // Exit Quiz Functions
+  function showLockedModuleAlert() {
+    alert('🔒 This module is locked. Complete the previous module and pass the exit quiz to unlock it.');
+  }
+
+  async function takeExitQuiz(courseId, moduleIdx) {
+    currentModuleIndex = moduleIdx;
+    
+    try {
+      const response = await fetch(`/course/${courseId}/module/${moduleIdx}/exit-quiz`);
+      if (!response.ok) throw new Error('Failed to load exit quiz');
+      
+      const data = await response.json();
+      currentExitQuiz = data.quiz;
+      
+      // Display quiz in modal
+      const questionsContainer = document.getElementById('exit-quiz-questions');
+      questionsContainer.innerHTML = '';
+      
+      data.quiz.forEach((question, index) => {
+        const questionElement = document.createElement('div');
+        questionElement.className = 'rounded-lg border border-zinc-800 bg-zinc-900/30 p-4';
+        questionElement.innerHTML = `
+          <h3 class="mb-3 font-medium text-zinc-100">Question ${index + 1}</h3>
+          <p class="mb-3 text-sm text-zinc-300">${question.question}</p>
+          <div class="grid gap-2">
+            ${question.options.map((option, optIndex) => `
+              <label class="flex items-center gap-2">
+                <input type="radio" name="q${index}" value="${optIndex}" class="text-indigo-500">
+                <span class="text-sm text-zinc-200">${option}</span>
+              </label>
+            `).join('')}
+          </div>
+        `;
+        questionsContainer.appendChild(questionElement);
+      });
+      
+      // Show modal
+      document.getElementById('exit-quiz-modal').classList.remove('hidden');
+      
+    } catch (err) {
+      console.error(err);
+      alert('Failed to load exit quiz. Please try again.');
+    }
+  }
+
+  function closeExitQuizModal() {
+    document.getElementById('exit-quiz-modal').classList.add('hidden');
+  }
+
+  async function submitExitQuiz() {
+    if (!currentExitQuiz || currentModuleIndex === null) return;
+    
+    // Collect answers
+    const answers = [];
+    currentExitQuiz.forEach((_, index) => {
+      const selected = document.querySelector(`input[name="q${index}"]:checked`);
+      answers.push(selected ? parseInt(selected.value) : -1);
+    });
+    
+    try {
+      const response = await fetch(`/course/${COURSE_ID}/module/${currentModuleIndex}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers })
+      });
+      
+      if (!response.ok) throw new Error('Failed to submit quiz');
+      
+      const result = await response.json();
+      
+      closeExitQuizModal();
+      
+      // Show result modal
+      const resultContent = document.getElementById('quiz-result-content');
+      
+      if (result.passed) {
+        resultContent.innerHTML = `
+          <div class="mb-4 text-4xl">🎉</div>
+          <h2 class="mb-2 text-2xl font-bold text-green-400">Congratulations! 🥳</h2>
+          <p class="mb-4 text-zinc-300">You passed the exit quiz with a score of <strong>${result.score}/3</strong>!</p>
+          <p class="mb-4 text-sm text-zinc-400">${result.feedback}</p>
+          <div class="inline-block rounded-lg border border-green-900 bg-green-950/30 px-3 py-1 text-sm text-green-300">
+            🔓 Module Unlocked!
+          </div>
+        `;
+        
+        // Update UI to show module as unlocked
+        setTimeout(() => {
+          location.reload(); // Refresh to update module states
+        }, 2000);
+        
+      } else {
+        resultContent.innerHTML = `
+          <div class="mb-4 text-4xl">💔</div>
+          <h2 class="mb-2 text-2xl font-bold text-red-400">Not Quite There Yet</h2>
+          <p class="mb-4 text-zinc-300">You scored <strong>${result.score}/3</strong>. You need at least 2 correct answers to pass.</p>
+          <p class="mb-4 text-sm text-zinc-400">${result.feedback}</p>
+          <p class="text-sm text-zinc-400">Please review the module content and try again!</p>
+        `;
+      }
+      
+      document.getElementById('quiz-result-modal').classList.remove('hidden');
+      
+    } catch (err) {
+      console.error(err);
+      alert('Failed to submit quiz. Please try again.');
+    }
+  }
+
+  function closeQuizResultModal() {
+    document.getElementById('quiz-result-modal').classList.add('hidden');
   }
 
   // Event listeners
@@ -506,7 +753,7 @@ async function loadLesson(courseId, moduleIdx, topicIdx) {
     }, 3000);
   }
 
-  // Voice interaction setup (from original, simplified)
+  // Voice interaction setup
   const voiceUI = {
     listening: false,
     recognition: null,
