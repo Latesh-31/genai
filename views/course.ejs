@@ -1,51 +1,115 @@
-<div class="mx-auto max-w-6xl px-6 py-8">
-  <div class="flex items-start justify-between gap-6">
-    <div>
-      <h1 class="text-2xl font-semibold text-zinc-100"><%= course.topic %></h1>
-      <p class="mt-1 text-sm text-zinc-400">Progress: <span class="text-zinc-200"><%= course.progress %>%</span></p>
-    </div>
-    <a href="/dashboard" class="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900">Back to dashboard</a>
-  </div>
-
-  <% if (message) { %>
-    <div class="mt-6 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-200"><%= message %></div>
-  <% } %>
-
-  <div class="mt-8 grid grid-cols-1 gap-4">
-    <% if (!syllabus || syllabus.length === 0) { %>
-      <div class="rounded-xl border border-zinc-800 bg-zinc-950/40 p-5">
-        <h2 class="text-base font-semibold text-zinc-100">No syllabus available</h2>
-        <p class="mt-2 text-sm text-zinc-400">The syllabus JSON could not be parsed.</p>
+<div class="flex h-[calc(100vh-65px)] overflow-hidden">
+  <!-- Sidebar -->
+  <aside class="w-80 flex-shrink-0 overflow-y-auto border-r border-zinc-800 bg-zinc-950 p-6">
+    <div class="mb-6">
+      <a href="/dashboard" class="mb-4 inline-block text-xs text-zinc-500 hover:text-zinc-300">&larr; Dashboard</a>
+      <h1 class="text-xl font-bold text-zinc-100"><%= course.topic %></h1>
+      <div class="mt-2 flex items-center gap-2">
+        <span class="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-400">
+          <%= course.level %>
+        </span>
+        <span class="text-xs text-zinc-500"><%= syllabus.length %> Modules</span>
       </div>
-    <% } else { %>
-      <% syllabus.forEach(function(m, idx) { %>
-        <div class="rounded-xl border border-zinc-800 bg-zinc-950/40 p-5">
-          <div class="flex items-center justify-between">
-            <h2 class="text-base font-semibold text-zinc-100"><%= m.title || `Module ${idx + 1}` %></h2>
-            <span class="text-xs text-zinc-500">Module <%= idx + 1 %> / <%= syllabus.length %></span>
-          </div>
-          <p class="mt-2 text-sm text-zinc-400"><%= m.summary || '' %></p>
+    </div>
 
-          <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div class="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-              <p class="text-xs font-semibold tracking-widest text-zinc-400">OBJECTIVES</p>
-              <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-200">
-                <% (m.objectives || []).forEach(function(o) { %>
-                  <li><%= o %></li>
-                <% }) %>
-              </ul>
-            </div>
-            <div class="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-              <p class="text-xs font-semibold tracking-widest text-zinc-400">PRACTICE</p>
-              <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-200">
-                <% (m.practice || []).forEach(function(p) { %>
-                  <li><%= p %></li>
-                <% }) %>
-              </ul>
-            </div>
-          </div>
+    <div class="space-y-6">
+      <% syllabus.forEach((module, mIdx) => { %>
+        <div class="relative pl-4">
+          <!-- Timeline line -->
+          <div class="absolute left-0 top-2 h-full w-0.5 bg-zinc-800"></div>
+          
+          <h3 class="relative mb-2 text-sm font-semibold text-zinc-200">
+            <span class="absolute -left-[21px] top-0.5 h-3 w-3 rounded-full border-2 border-zinc-950 bg-zinc-700"></span>
+            <%= module.title %>
+          </h3>
+          <p class="mb-3 text-xs text-zinc-500"><%= module.description %></p>
+          
+          <ul class="space-y-1">
+            <% module.topics.forEach((topic, tIdx) => { %>
+              <li>
+                <button 
+                  onclick="loadLesson('<%= course.id %>', <%= mIdx %>, <%= tIdx %>)"
+                  class="w-full rounded px-2 py-1.5 text-left text-sm text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-200 focus:bg-zinc-900 focus:text-zinc-100 focus:outline-none"
+                  id="btn-<%= mIdx %>-<%= tIdx %>"
+                >
+                  <%= topic %>
+                </button>
+              </li>
+            <% }) %>
+          </ul>
         </div>
       <% }) %>
-    <% } %>
-  </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="flex-1 overflow-y-auto bg-zinc-900/30 p-8 sm:p-12">
+    <div id="lesson-container" class="mx-auto max-w-3xl">
+      <div id="empty-state" class="flex flex-col items-center justify-center py-20 text-center">
+        <div class="mb-4 rounded-full bg-zinc-900 p-4 ring-1 ring-zinc-800">
+          <svg class="h-8 w-8 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+        </div>
+        <h2 class="text-xl font-semibold text-zinc-200">Select a topic to start learning</h2>
+        <p class="mt-2 text-zinc-500">Choose a lesson from the syllabus on the left.</p>
+      </div>
+
+      <div id="loading-state" class="hidden py-20 text-center">
+        <div class="inline-block h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500"></div>
+        <p class="mt-4 text-sm text-zinc-400">Generating lesson with AI...</p>
+      </div>
+
+      <div id="content-display" class="hidden">
+        <h1 id="lesson-title" class="mb-6 text-3xl font-bold text-zinc-100"></h1>
+        <div id="lesson-body" class="prose prose-invert prose-zinc max-w-none"></div>
+      </div>
+    </div>
+  </main>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+  async function loadLesson(courseId, moduleIdx, topicIdx) {
+    const emptyState = document.getElementById('empty-state');
+    const loadingState = document.getElementById('loading-state');
+    const contentDisplay = document.getElementById('content-display');
+    const titleEl = document.getElementById('lesson-title');
+    const bodyEl = document.getElementById('lesson-body');
+    
+    // UI Update
+    emptyState.classList.add('hidden');
+    contentDisplay.classList.add('hidden');
+    loadingState.classList.remove('hidden');
+
+    // Highlight active button
+    document.querySelectorAll('button[id^="btn-"]').forEach(btn => {
+      btn.classList.remove('bg-zinc-800', 'text-zinc-100', 'font-medium');
+      btn.classList.add('text-zinc-400');
+    });
+    const activeBtn = document.getElementById(`btn-${moduleIdx}-${topicIdx}`);
+    if (activeBtn) {
+      activeBtn.classList.add('bg-zinc-800', 'text-zinc-100', 'font-medium');
+      activeBtn.classList.remove('text-zinc-400');
+    }
+
+    try {
+      const response = await fetch(`/course/${courseId}/lesson/${moduleIdx}/${topicIdx}`);
+      if (!response.ok) throw new Error('Failed to load lesson');
+      
+      const data = await response.json();
+      
+      titleEl.textContent = data.topic;
+      bodyEl.innerHTML = marked.parse(data.content);
+      
+      loadingState.classList.add('hidden');
+      contentDisplay.classList.remove('hidden');
+    } catch (err) {
+      console.error(err);
+      loadingState.classList.add('hidden');
+      emptyState.classList.remove('hidden');
+      emptyState.querySelector('h2').textContent = 'Error loading lesson';
+      emptyState.querySelector('p').textContent = 'Please try again.';
+    }
+  }
+</script>
