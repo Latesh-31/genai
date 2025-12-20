@@ -280,6 +280,9 @@ async function evaluateAndCreateSyllabus(subject, userAnswers, quizQuestions) {
   };
 }
 
+// --------------------------------------------------------
+// CHANGED: Support for 'chart' type added here
+// --------------------------------------------------------
 function validateLessonCards(cards) {
   if (!Array.isArray(cards) || cards.length === 0) {
     throw new Error('AI lesson must have at least one card');
@@ -290,8 +293,9 @@ function validateLessonCards(cards) {
       throw new Error(`Invalid card at index ${idx}`);
     }
     
-    if (!['text', 'quiz', 'challenge'].includes(card.type)) {
-      throw new Error(`Card ${idx} must have type 'text', 'quiz', or 'challenge'`);
+    // ALLOW 'chart' TYPE
+    if (!['text', 'quiz', 'challenge', 'chart'].includes(card.type)) {
+      throw new Error(`Card ${idx} must have type 'text', 'quiz', 'challenge', or 'chart'`);
     }
     
     if (card.type === 'text') {
@@ -300,6 +304,13 @@ function validateLessonCards(cards) {
       }
       if (card.image != null && typeof card.image !== 'string') {
         throw new Error(`Text card ${idx} image must be a string`);
+      }
+    }
+
+    // VALIDATE CHART
+    if (card.type === 'chart') {
+      if (typeof card.content !== 'string' || !card.content.trim()) {
+        throw new Error(`Chart card ${idx} must have mermaid content string`);
       }
     }
     
@@ -339,6 +350,9 @@ function validateLessonCards(cards) {
   return cards;
 }
 
+// --------------------------------------------------------
+// CHANGED: Prompt now specifically requests Mermaid charts
+// --------------------------------------------------------
 async function generateLesson(topic, userLevel) {
   const model = getModel();
 
@@ -347,14 +361,22 @@ async function generateLesson(topic, userLevel) {
     'Use the "Feynman Technique" (simple language, analogies).',
     'Use emojis and humor to make learning fun and engaging.',
     'Break the topic into bite-sized interactive learning moments.',
+    '',
+    '**Visuals & Flowcharts:**',
+    'Instead of static images, use "chart" cards for processes, logic flows, or structural concepts.',
+    'For "chart" cards, provide ONLY valid Mermaid.js syntax (e.g., "graph TD; A-->B;") in the content field. No markdown blocks.',
+    '',
     'Output STRICT JSON with this structure:',
     '{',
     '  "title": "The basics of...",',
     '  "cards": [',
     '    {',
     '      "type": "text",',
-    '      "content": "Imagine atoms are like LEGO bricks... 🏗️",',
-    '      "image": "optional-image-url"',
+    '      "content": "Imagine atoms are like LEGO bricks... 🏗️"',
+    '    },',
+    '    {',
+    '      "type": "chart",',
+    '      "content": "graph TD; A[Atoms] --> B[Protons]; A --> C[Electrons];"',
     '    },',
     '    {',
     '      "type": "quiz",',

@@ -1,790 +1,410 @@
-<div class="flex h-[calc(100vh-65px)] overflow-hidden">
-  <aside class="w-[380px] flex-shrink-0 overflow-y-auto border-r border-zinc-800 bg-zinc-950 p-6">
-    <div class="mb-6">
-      <a href="/dashboard" class="mb-4 inline-block text-xs text-zinc-500 hover:text-zinc-300">&larr; Dashboard</a>
-      <h1 class="text-xl font-bold text-zinc-100"><%= course.topic %></h1>
-      <div class="mt-2 flex flex-wrap items-center gap-2">
-        <span class="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-400">
-          <%= course.level %>
-        </span>
-        <span class="text-xs text-zinc-500"><%= syllabus.length %> Modules</span>
-        <span class="text-xs text-zinc-500">•</span>
-        <span class="text-xs text-zinc-500">Progress: <%= course.progress || 0 %>%</span>
-      </div>
-    </div>
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= typeof course !== 'undefined' ? course.topic : 'Course' %> | AdaptLearn AI</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/lucide-static@0.321.0/font/lucide.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
     <style>
-      @keyframes popIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
-      .mind-node { animation: popIn .22s ease-out forwards; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #18181b; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #52525b; }
+        
+        .prose p { margin-bottom: 1rem; color: #d4d4d8; line-height: 1.7; }
+        .prose strong { color: #fff; font-weight: 600; }
+        .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; color: #d4d4d8; }
+        
+        .prose code { background: #27272a; padding: 0.2rem 0.4rem; border-radius: 4px; color: #a5b4fc; font-family: monospace; }
+        .prose pre { background: #18181b; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin-bottom: 1rem; }
     </style>
+</head>
+<body class="bg-zinc-950 text-zinc-200 h-screen flex overflow-hidden font-sans selection:bg-indigo-500/30">
 
-    <section class="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
-      <div class="mb-3 flex items-center justify-between">
-        <h2 class="text-sm font-semibold text-zinc-200">Learning Map</h2>
-        <span class="text-xs text-zinc-500">Nodes & Edges</span>
-      </div>
+    <script id="lesson-data-json" type="application/json">
+        <%- (typeof lesson !== 'undefined' && lesson) ? JSON.stringify(lesson) : 'null' %>
+    </script>
 
-      <div id="mindmap" class="relative h-56 overflow-hidden rounded-lg bg-zinc-950/40 ring-1 ring-zinc-800">
-        <svg class="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <% for (let i = 0; i < syllabus.length - 1; i++) { %>
-            <% const a = syllabus[i]?.node || { x: i % 2 === 0 ? 24 : 76, y: 12 + (i * 76 / Math.max(1, syllabus.length - 1)) }; %>
-            <% const b = syllabus[i + 1]?.node || { x: (i + 1) % 2 === 0 ? 24 : 76, y: 12 + ((i + 1) * 76 / Math.max(1, syllabus.length - 1)) }; %>
-            <line x1="<%= a.x %>" y1="<%= a.y %>" x2="<%= b.x %>" y2="<%= b.y %>" stroke="rgba(113,113,122,0.55)" stroke-width="1" />
-          <% } %>
-        </svg>
-
-        <% syllabus.forEach((mod, mIdx) => { %>
-          <% const node = mod?.node || { x: mIdx % 2 === 0 ? 24 : 76, y: 12 + (mIdx * 76 / Math.max(1, syllabus.length - 1)) }; %>
-          <button
-            id="module-node-<%= mIdx %>"
-            type="button"
-            data-module-index="<%= mIdx %>"
-            style="left: <%= node.x %>%; top: <%= node.y %>%; animation-delay: <%= mIdx * 80 %>ms"
-            class="mind-node absolute -translate-x-1/2 -translate-y-1/2 rounded-full border px-3 py-2 text-xs font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-          >
-            <span class="mr-1"><%= mIdx + 1 %></span>
-            <span class="hidden sm:inline">•</span>
-            <span class="hidden sm:inline"><%= (mod.title || '').split(':')[0].slice(0, 18) %></span>
-          </button>
-        <% }) %>
-      </div>
-
-      <div id="module-panel" class="mt-4 rounded-lg border border-zinc-800 bg-zinc-950/30 p-4">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <div id="module-title" class="text-sm font-semibold text-zinc-100">Module</div>
-            <div id="module-desc" class="mt-1 text-xs text-zinc-500"></div>
-          </div>
-          <span id="module-state-badge" class="rounded-full border border-zinc-800 bg-zinc-950 px-2 py-0.5 text-xs text-zinc-400"></span>
-        </div>
-
-        <div id="topics" class="mt-4 space-y-2"></div>
-      </div>
-    </section>
-  </aside>
-
-  <main class="flex-1 overflow-hidden bg-zinc-900/30">
-    <div id="lesson-container" class="relative h-full w-full">
-      <div id="empty-state" class="flex h-full flex-col items-center justify-center py-20 text-center">
-        <div class="mb-4 rounded-full bg-zinc-900 p-4 ring-1 ring-zinc-800">
-          <svg class="h-8 w-8 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
-        </div>
-        <h2 class="text-xl font-semibold text-zinc-200">Select a topic to start learning</h2>
-        <p class="mt-2 text-zinc-500">Pick a module node on the left and choose a lesson.</p>
-      </div>
-
-      <div id="loading-state" class="hidden flex h-full items-center justify-center">
-        <div class="text-center">
-          <div class="inline-block h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500"></div>
-          <p class="mt-4 text-sm text-zinc-400">Generating lesson with AI 🚀</p>
-        </div>
-      </div>
-
-      <div id="card-deck" class="hidden h-full w-full p-8 sm:p-12">
-        <div class="mb-8">
-          <div class="mb-2 flex justify-between text-sm text-zinc-400">
-            <span id="card-progress-label">Card 1 of X</span>
-            <span>Progress</span>
-          </div>
-          <div class="h-2 w-full rounded-full bg-zinc-800">
-            <div id="progress-bar" class="h-full rounded-full bg-gradient-to-r from-green-400 to-emerald-400 transition-all duration-300" style="width: 0%"></div>
-          </div>
-        </div>
-
-        <div id="card-container" class="mx-auto max-w-3xl">
-          <div class="mb-2 text-xs text-zinc-500" id="lesson-meta"></div>
-          <h1 id="lesson-title" class="mb-6 text-3xl font-bold text-zinc-100"></h1>
-
-          <div id="card-content" class="relative rounded-xl border border-zinc-800 bg-zinc-900/50 p-8 shadow-2xl"></div>
-
-          <div class="mt-6 flex justify-between">
-            <button id="prev-btn" class="rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 transition-all hover:bg-zinc-700 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95" disabled>
-              ← Previous
-            </button>
-            <button id="next-btn" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95" disabled>
-              Next →
-            </button>
-          </div>
-        </div>
-
-        <div id="completion-celebration" class="hidden absolute inset-0 flex items-center justify-center bg-zinc-900/90 backdrop-blur-sm">
-          <div class="text-center">
-            <div class="mb-4 text-6xl">🎉</div>
-            <h2 class="mb-2 text-3xl font-bold text-green-400">Lesson Complete!</h2>
-            <p class="mb-4 text-lg text-zinc-300">You earned <span class="font-bold text-yellow-400">+100 XP</span></p>
-
-            <div class="flex flex-wrap justify-center gap-2">
-              <button onclick="closeLesson()" class="rounded-lg bg-zinc-800 px-6 py-3 text-white transition-all hover:bg-zinc-700 active:scale-95">
-                Back to Map
-              </button>
-              <button id="unlock-next-btn" onclick="openExitQuiz()" class="hidden rounded-lg bg-indigo-600 px-6 py-3 text-white transition-all hover:bg-indigo-500 active:scale-95">
-                Take Quiz to Unlock Next Module
-              </button>
+    <aside class="w-80 border-r border-zinc-800 bg-zinc-900/50 flex flex-col hidden md:flex">
+        <div class="p-6 border-b border-zinc-800">
+            <a href="/dashboard" class="flex items-center text-xs text-zinc-500 hover:text-white mb-4 transition uppercase tracking-widest font-bold">
+                <i class="lucide-arrow-left w-3 h-3 mr-1"></i> Dashboard
+            </a>
+            <h1 class="text-xl font-bold text-white leading-tight mb-1">
+                <%= typeof course !== 'undefined' ? course.topic : 'Loading...' %>
+            </h1>
+            <div class="flex items-center space-x-2 mt-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-400 border border-zinc-700">
+                    <%= typeof course !== 'undefined' ? course.level : 'Beginner' %>
+                </span>
+                <span class="text-xs text-zinc-500">
+                    <%= typeof course !== 'undefined' && course.syllabus ? course.syllabus.length : 0 %> Modules
+                </span>
             </div>
-          </div>
         </div>
-      </div>
+        
+        <nav class="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+            <% if (typeof course !== 'undefined' && course.syllabus && course.syllabus.length > 0) { %>
+                <% course.syllabus.forEach((module, index) => { 
+                    const isActive = (index === 0);
+                    const baseClass = "cursor-pointer group p-4 rounded-xl border transition-all duration-200 module-item";
+                    const activeState = "bg-indigo-500/5 border-indigo-500/30 shadow-[0_0_15px_-3px_rgba(99,102,241,0.1)]";
+                    const inactiveState = "bg-zinc-900/30 border-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-700";
+                    const finalClass = `${baseClass} ${isActive ? activeState : inactiveState}`;
+                %>
+                    <div data-index="<%= index %>" class="<%= finalClass %>">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[10px] font-bold uppercase tracking-widest <%= isActive ? 'text-indigo-400' : 'text-zinc-500 group-hover:text-zinc-400' %>">
+                                Module <%= index + 1 %>
+                            </span>
+                            <% if(isActive) { %>
+                                <div class="flex h-2 w-2 relative">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                                </div>
+                            <% } else { %>
+                                <i class="lucide-lock w-3 h-3 text-zinc-700"></i>
+                            <% } %>
+                        </div>
+                        <h3 class="font-medium text-sm text-zinc-300 group-hover:text-white transition-colors">
+                            <%= module.title %>
+                        </h3>
+                    </div>
+                <% }) %>
+            <% } else { %>
+                <div class="p-4 text-center text-zinc-500 text-sm">No modules loaded.</div>
+            <% } %>
+        </nav>
+    </aside>
 
-      <section id="tutor-section" class="hidden absolute bottom-0 left-0 right-0 border-t border-zinc-800 bg-zinc-950/95 p-6 backdrop-blur-sm">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 class="text-sm font-semibold text-zinc-200">AI Tutor</h2>
-
-          <div class="flex items-center gap-2">
-            <span id="listening-badge" class="hidden rounded-full border border-red-900 bg-red-950/30 px-2 py-0.5 text-xs text-red-300">Listening...</span>
-            <span id="voice-unsupported" class="hidden text-xs text-zinc-500">Voice not supported</span>
-          </div>
-        </div>
-
-        <div id="tutor-messages" class="mt-4 space-y-3"></div>
-
-        <form id="tutor-form" class="mt-4 flex items-center gap-2">
-          <input
-            id="tutor-input"
-            name="question"
-            type="text"
-            autocomplete="off"
-            placeholder="Ask the AI tutor about this lesson..."
-            class="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-          />
-
-          <button
-            id="mic-btn"
-            type="button"
-            class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950/40 text-zinc-400 transition-all hover:bg-zinc-900 hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 active:scale-95"
-            title="Speak"
-            aria-label="Speak"
-          >
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z" />
-              <path d="M19 11a7 7 0 0 1-14 0" />
-              <path d="M12 18v3" />
-              <path d="M8 21h8" />
-            </svg>
-          </button>
-
-          <button
-            type="submit"
-            class="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white transition-all hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 active:scale-95"
-          >
-            Send
-          </button>
-        </form>
-      </section>
-
-      <div id="exit-quiz-modal" class="hidden absolute inset-0 z-40 items-center justify-center bg-zinc-950/70 p-6 backdrop-blur-sm">
-        <div class="w-full max-w-2xl rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <div class="text-xs font-semibold tracking-widest text-zinc-400">GATEKEEPER QUIZ</div>
-              <h3 id="exit-quiz-title" class="mt-2 text-xl font-bold text-zinc-100">Exit Quiz</h3>
-              <p class="mt-1 text-sm text-zinc-400">Score 2/3 to unlock the next module.</p>
+    <main class="flex-1 flex flex-col items-center justify-center relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-900 via-zinc-950 to-zinc-950">
+        
+        <div class="absolute top-0 w-full p-6 flex justify-between items-center bg-gradient-to-b from-zinc-950 to-transparent z-10">
+            <span class="text-zinc-500 text-sm font-medium tracking-wide">
+                Card <span id="card-index" class="text-white">1</span> <span class="text-zinc-700">/</span> <span id="card-total">--</span>
+            </span>
+            <div class="w-48 h-1.5 bg-zinc-900 border border-zinc-800 rounded-full overflow-hidden">
+                <div id="progress-bar" class="h-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)] transition-all duration-500 ease-out" style="width: 0%"></div>
             </div>
-            <button type="button" onclick="closeExitQuiz()" class="rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-sm text-zinc-200 transition-all hover:bg-zinc-900 active:scale-95">Close</button>
-          </div>
-
-          <div id="exit-quiz-body" class="mt-5 space-y-5"></div>
-
-          <div id="exit-quiz-feedback" class="mt-5 hidden rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 text-sm"></div>
-
-          <div class="mt-6 flex justify-end gap-3">
-            <button type="button" onclick="submitExitQuiz()" class="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition-all hover:bg-indigo-500 active:scale-95">Submit & Unlock</button>
-          </div>
         </div>
-      </div>
-    </div>
-  </main>
-</div>
 
-<canvas id="confetti-canvas" class="pointer-events-none fixed inset-0 z-50 hidden"></canvas>
+        <div class="w-full max-w-3xl flex flex-col max-h-[75vh] mx-4">
+            <div class="relative flex flex-col bg-zinc-900/80 backdrop-blur-xl border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden ring-1 ring-white/5">
+                
+                <div id="card-container" class="p-8 md:p-12 overflow-y-auto custom-scrollbar">
+                    <div id="card-content" class="space-y-6 min-h-[300px]">
+                        <div class="flex flex-col items-center justify-center h-48 space-y-4 animate-pulse">
+                            <div class="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                            <p class="text-zinc-500 text-sm">Preparing lesson...</p>
+                        </div>
+                    </div>
+                </div>
 
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script>
-  const COURSE_ID = <%= Number(course.id) %>;
-  const SYLLABUS = <%- JSON.stringify(syllabus || []) %>;
-  let completedModules = <%= Number.isInteger(course.completed_modules) ? course.completed_modules : 0 %>;
+                <div class="p-4 md:p-6 bg-zinc-900 border-t border-zinc-800 flex items-center justify-between gap-4">
+                    <button onclick="prevCard()" class="px-4 py-2 text-zinc-400 hover:text-white text-sm font-medium transition flex items-center gap-2 group">
+                        <i class="lucide-arrow-left w-4 h-4 group-hover:-translate-x-1 transition-transform"></i> Back
+                    </button>
 
-  let selectedModuleIndex = Math.min(completedModules, Math.max(0, SYLLABUS.length - 1));
-  let activeModuleIdx = null;
-  let activeTopicIdx = null;
+                    <button onclick="toggleVoice()" id="mic-btn" class="relative p-3 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white border border-zinc-700 transition-all active:scale-95 group">
+                        <span id="mic-pulse" class="absolute inset-0 rounded-full bg-red-500/20 animate-ping hidden"></span>
+                        <i class="lucide-mic w-5 h-5"></i>
+                    </button>
 
-  let currentLesson = null;
-  let currentCardIndex = 0;
-
-  function moduleState(idx) {
-    if (idx < completedModules) return 'completed';
-    if (idx === completedModules) return 'current';
-    return 'locked';
-  }
-
-  function stateBadgeText(state) {
-    if (state === 'completed') return '✅ Completed';
-    if (state === 'current') return '🟢 Unlocked';
-    return '🔒 Locked';
-  }
-
-  function buildFallbackExitQuiz(mod) {
-    const topics = Array.isArray(mod?.topics) ? mod.topics : [];
-    const seed = topics.slice(0, 3);
-    const promptTopic = seed[0] || mod?.title || 'this module';
-
-    return Array.from({ length: 3 }).map((_, idx) => {
-      const focus = seed[idx] || promptTopic;
-
-      return {
-        question: `Quick check: which option best matches the key idea of "${focus}"?`,
-        options: [
-          `The core definition/concept of ${focus}`,
-          `An unrelated idea that sounds similar`,
-          `A common misconception about ${focus}`,
-          `A detail that is true but not the main idea`
-        ],
-        correctIndex: 0
-      };
-    });
-  }
-
-  function getExitQuiz(mod) {
-    const quiz = Array.isArray(mod?.exit_quiz) ? mod.exit_quiz : [];
-    return quiz.length === 3 ? quiz : buildFallbackExitQuiz(mod);
-  }
-
-  function applyNodeState(nodeEl, idx) {
-    const state = moduleState(idx);
-
-    nodeEl.disabled = state === 'locked';
-
-    nodeEl.className =
-      'mind-node absolute -translate-x-1/2 -translate-y-1/2 rounded-full border px-3 py-2 text-xs font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 ' +
-      (state === 'completed'
-        ? 'border-green-800 bg-green-950/40 text-green-200 hover:bg-green-950/70'
-        : state === 'current'
-          ? 'border-indigo-700 bg-indigo-950/40 text-indigo-200 shadow-lg shadow-indigo-500/20 animate-pulse'
-          : 'border-zinc-800 bg-zinc-950/60 text-zinc-500 cursor-not-allowed');
-  }
-
-  function renderMindMap() {
-    for (let i = 0; i < SYLLABUS.length; i++) {
-      const nodeEl = document.getElementById(`module-node-${i}`);
-      if (!nodeEl) continue;
-      applyNodeState(nodeEl, i);
-    }
-  }
-
-  function renderModulePanel(moduleIndex) {
-    const mod = SYLLABUS[moduleIndex];
-    if (!mod) return;
-
-    const state = moduleState(moduleIndex);
-    const titleEl = document.getElementById('module-title');
-    const descEl = document.getElementById('module-desc');
-    const badgeEl = document.getElementById('module-state-badge');
-    const topicsEl = document.getElementById('topics');
-
-    titleEl.textContent = `Module ${moduleIndex + 1}: ${mod.title || ''}`;
-    descEl.textContent = mod.description || '';
-    badgeEl.textContent = stateBadgeText(state);
-
-    if (state === 'locked') {
-      topicsEl.innerHTML = `
-        <div class="rounded-lg border border-zinc-800 bg-zinc-950/40 p-4 text-sm text-zinc-400">
-          This module is locked. Pass the exit quiz from Module ${completedModules + 1} to unlock it.
+                    <button onclick="nextCard()" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition flex items-center shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 active:scale-95">
+                        Next <i class="lucide-arrow-right w-4 h-4 ml-2"></i>
+                    </button>
+                </div>
+            </div>
         </div>
-      `;
-      return;
-    }
 
-    const topics = Array.isArray(mod.topics) ? mod.topics : [];
-
-    topicsEl.innerHTML = `
-      <div class="text-xs font-semibold tracking-widest text-zinc-400">TOPICS</div>
-      <div class="mt-2 space-y-2">
-        ${topics.map((topic, tIdx) => `
-          <button
-            type="button"
-            onclick="loadLesson(${COURSE_ID}, ${moduleIndex}, ${tIdx})"
-            class="w-full rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-left text-sm text-zinc-200 transition-all hover:bg-zinc-900 active:scale-[0.99]"
-          >
-            ${topic}
-          </button>
-        `).join('')}
-      </div>
-    `;
-  }
-
-  document.querySelectorAll('[id^="module-node-"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const idx = Number(btn.dataset.moduleIndex);
-      if (!Number.isInteger(idx)) return;
-      selectedModuleIndex = idx;
-      renderModulePanel(selectedModuleIndex);
-    });
-  });
-
-  function renderTextCard(card) {
-    return `
-      <div class="text-lg text-zinc-100">${marked.parse(card.content || '')}</div>
-      ${card.image ? `<img src="${card.image}" alt="Lesson image" class="mt-4 rounded-lg">` : ''}
-    `;
-  }
-
-  function renderQuizCard(card, cardIndex) {
-    return `
-      <div class="text-center">
-        <h3 class="mb-6 text-2xl font-bold text-zinc-100">${card.question}</h3>
-        <div class="grid gap-3" id="quiz-options-${cardIndex}">
-          ${(card.options || []).map((option, idx) => `
-            <button
-              type="button"
-              onclick="selectQuizOption('${(card.answer || '').replace(/'/g, "\\'")}', '${String(option).replace(/'/g, "\\'")}', ${cardIndex}, ${idx})"
-              class="quiz-option rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-left text-zinc-300 transition-all hover:border-zinc-600 hover:bg-zinc-700 hover:text-zinc-100 disabled:cursor-not-allowed"
-            >
-              ${option}
-            </button>
-          `).join('')}
+        <div class="absolute bottom-6 w-full max-w-2xl px-4">
+            <form onsubmit="askTutor(event); return false;" class="relative group">
+                <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl opacity-20 group-hover:opacity-40 transition duration-500 blur"></div>
+                <input type="text" id="tutor-input" placeholder="Ask the AI Tutor about this card..." 
+                    class="relative w-full bg-zinc-950 border border-zinc-800 rounded-xl py-3.5 px-5 pr-12 text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 transition shadow-xl">
+                <button type="submit" class="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-zinc-500 hover:text-indigo-400 transition">
+                    <i class="lucide-send w-4 h-4"></i>
+                </button>
+            </form>
         </div>
-        <div id="quiz-feedback-${cardIndex}" class="mt-4 hidden rounded-lg p-3 text-sm"></div>
-      </div>
-    `;
-  }
+    </main>
 
-  function renderChallengeCard(card) {
-    return `
-      <div class="text-center">
-        <div class="mb-2 text-4xl">🎯</div>
-        <h3 class="mb-4 text-xl font-bold text-zinc-100">Challenge Time!</h3>
-        <p class="mb-6 text-lg text-zinc-200">${card.prompt}</p>
-        <div class="rounded-lg border border-dashed border-zinc-700 bg-zinc-800/50 p-6 text-center text-zinc-400">
-          💡 Hint: ${card.hint}
-        </div>
-      </div>
-    `;
-  }
-
-  function renderCard(card, index) {
-    if (!card) return '<div class="text-red-400">Missing card</div>';
-    if (card.type === 'text') return renderTextCard(card);
-    if (card.type === 'quiz') return renderQuizCard(card, index);
-    if (card.type === 'challenge') return renderChallengeCard(card);
-    return '<div class="text-red-400">Unknown card type</div>';
-  }
-
-  function updateProgress() {
-    if (!currentLesson) return;
-
-    const progressLabel = document.getElementById('card-progress-label');
-    const progressBar = document.getElementById('progress-bar');
-
-    progressLabel.textContent = `Card ${currentCardIndex + 1} of ${currentLesson.cards.length}`;
-
-    const percentage = ((currentCardIndex + 1) / currentLesson.cards.length) * 100;
-    progressBar.style.width = `${percentage}%`;
-  }
-
-  function refreshCard() {
-    const prevBtn = document.getElementById('prev-btn');
-    const nextBtn = document.getElementById('next-btn');
-    const cardContent = document.getElementById('card-content');
-    const tutorSection = document.getElementById('tutor-section');
-
-    if (!currentLesson || !currentLesson.cards[currentCardIndex]) return;
-
-    const card = currentLesson.cards[currentCardIndex];
-    cardContent.innerHTML = renderCard(card, currentCardIndex);
-
-    prevBtn.disabled = currentCardIndex === 0;
-
-    if (card.type === 'quiz') {
-      nextBtn.disabled = true;
-      nextBtn.textContent = 'Answer first';
-    } else {
-      nextBtn.disabled = false;
-      nextBtn.textContent = currentCardIndex === currentLesson.cards.length - 1 ? 'Finish!' : 'Next →';
-    }
-
-    updateProgress();
-    tutorSection.classList.toggle('hidden', currentCardIndex === 0);
-  }
-
-  function nextCard() {
-    if (!currentLesson) return;
-    if (currentCardIndex < currentLesson.cards.length - 1) {
-      currentCardIndex++;
-      refreshCard();
-    } else {
-      completeLesson();
-    }
-  }
-
-  function previousCard() {
-    if (currentCardIndex > 0) {
-      currentCardIndex--;
-      refreshCard();
-    }
-  }
-
-  function selectQuizOption(correctAnswer, selectedAnswer, cardIndex, optionIndex) {
-    const options = document.querySelectorAll(`#quiz-options-${cardIndex} .quiz-option`);
-    const feedback = document.getElementById(`quiz-feedback-${cardIndex}`);
-    const nextBtn = document.getElementById('next-btn');
-
-    options.forEach((opt) => (opt.disabled = true));
-
-    if (selectedAnswer === correctAnswer) {
-      options[optionIndex].classList.add('bg-green-600', 'border-green-500', 'text-white');
-      feedback.className = 'mt-4 rounded-lg bg-green-950/30 p-3 text-sm text-green-300';
-      feedback.textContent = '🎉 Correct! ' + (currentLesson.cards[cardIndex].explanation || '');
-    } else {
-      options[optionIndex].classList.add('bg-red-600', 'border-red-500', 'text-white');
-      options.forEach((opt) => {
-        if (opt.textContent.trim() === correctAnswer) {
-          opt.classList.add('bg-green-600', 'border-green-500', 'text-white');
+    <script>
+        // 1. SETUP & UTILS
+        mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
+        
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        } else {
+            document.addEventListener('DOMContentLoaded', () => lucide.createIcons());
         }
-      });
-      feedback.className = 'mt-4 rounded-lg bg-red-950/30 p-3 text-sm text-red-300';
-      feedback.textContent = '💔 Not quite. ' + (currentLesson.cards[cardIndex].explanation || '');
-    }
 
-    feedback.classList.remove('hidden');
-    nextBtn.disabled = false;
-    nextBtn.textContent = currentCardIndex === currentLesson.cards.length - 1 ? 'Finish!' : 'Next →';
-  }
+        // --- LINTER FIX: Use Number() wrapper so VS Code doesn't complain ---
+        const courseId = Number("<%= course.id %>"); 
 
-  async function awardExperiencePoints(points) {
-    if (activeModuleIdx == null || activeTopicIdx == null) return;
-
-    try {
-      await fetch(`/course/${COURSE_ID}/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          moduleIndex: activeModuleIdx,
-          topicIndex: activeTopicIdx,
-          xpEarned: points
-        })
-      });
-    } catch (err) {
-      console.error('Failed to award XP:', err);
-    }
-  }
-
-  function completeLesson() {
-    document.getElementById('completion-celebration').classList.remove('hidden');
-    triggerConfetti();
-    awardExperiencePoints(100);
-
-    const unlockBtn = document.getElementById('unlock-next-btn');
-    const isCurrentModule = activeModuleIdx === completedModules;
-    const mod = SYLLABUS[activeModuleIdx];
-    const lastTopicIdx = mod && Array.isArray(mod.topics) ? mod.topics.length - 1 : -1;
-
-    const shouldOfferExitQuiz =
-      isCurrentModule &&
-      activeTopicIdx === lastTopicIdx &&
-      completedModules < SYLLABUS.length - 1;
-
-    unlockBtn.classList.toggle('hidden', !shouldOfferExitQuiz);
-  }
-
-  function closeLesson() {
-    document.getElementById('card-deck').classList.add('hidden');
-    document.getElementById('completion-celebration').classList.add('hidden');
-    document.getElementById('empty-state').classList.remove('hidden');
-
-    currentLesson = null;
-    currentCardIndex = 0;
-  }
-
-  async function loadLesson(courseId, moduleIdx, topicIdx) {
-    activeModuleIdx = moduleIdx;
-    activeTopicIdx = topicIdx;
-
-    document.getElementById('empty-state').classList.add('hidden');
-    document.getElementById('card-deck').classList.add('hidden');
-    document.getElementById('completion-celebration').classList.add('hidden');
-    document.getElementById('loading-state').classList.remove('hidden');
-    document.getElementById('tutor-section').classList.add('hidden');
-
-    document.getElementById('tutor-messages').innerHTML = '';
-
-    try {
-      const response = await fetch(`/course/${courseId}/lesson/${moduleIdx}/${topicIdx}`);
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || 'Failed to load lesson');
-      }
-
-      currentLesson = {
-        title: data.title,
-        cards: Array.isArray(data.cards) ? data.cards : []
-      };
-      currentCardIndex = 0;
-
-      document.getElementById('lesson-title').textContent = data.title;
-      document.getElementById('lesson-meta').textContent = `Module ${moduleIdx + 1} • Topic ${topicIdx + 1}`;
-
-      document.getElementById('loading-state').classList.add('hidden');
-      document.getElementById('card-deck').classList.remove('hidden');
-
-      refreshCard();
-    } catch (err) {
-      console.error(err);
-      document.getElementById('loading-state').classList.add('hidden');
-      document.getElementById('empty-state').classList.remove('hidden');
-      document.querySelector('#empty-state h2').textContent = 'Error loading lesson';
-      document.querySelector('#empty-state p').textContent = err.message || 'Please try again.';
-    }
-  }
-
-  document.getElementById('next-btn').addEventListener('click', nextCard);
-  document.getElementById('prev-btn').addEventListener('click', previousCard);
-
-  function triggerConfetti() {
-    const canvas = document.getElementById('confetti-canvas');
-    const ctx = canvas.getContext('2d');
-
-    canvas.classList.remove('hidden');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    const confetti = [];
-    const colors = ['#10b981', '#8b5cf6', '#f59e0b', '#3b82f6', '#ef4444', '#06b6d4'];
-
-    for (let i = 0; i < 160; i++) {
-      confetti.push({
-        x: Math.random() * canvas.width,
-        y: -Math.random() * 100,
-        vx: Math.random() * 4 - 2,
-        vy: Math.random() * 3 + 2,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        size: Math.random() * 6 + 2,
-        rotation: Math.random() * 360,
-        rotationSpeed: Math.random() * 10 - 5
-      });
-    }
-
-    const start = performance.now();
-
-    function animate(now) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      confetti.forEach((c) => {
-        c.x += c.vx;
-        c.y += c.vy;
-        c.vy += 0.07;
-        c.rotation += c.rotationSpeed;
-
-        ctx.save();
-        ctx.translate(c.x, c.y);
-        ctx.rotate((c.rotation * Math.PI) / 180);
-        ctx.fillStyle = c.color;
-        ctx.fillRect(-c.size / 2, -c.size / 2, c.size, c.size);
-        ctx.restore();
-      });
-
-      if (now - start < 2200) {
-        requestAnimationFrame(animate);
-      } else {
-        canvas.classList.add('hidden');
-      }
-    }
-
-    requestAnimationFrame(animate);
-  }
-
-  function openExitQuiz() {
-    const modal = document.getElementById('exit-quiz-modal');
-    const body = document.getElementById('exit-quiz-body');
-    const feedback = document.getElementById('exit-quiz-feedback');
-
-    const mod = SYLLABUS[activeModuleIdx];
-    const quiz = getExitQuiz(mod);
-
-    document.getElementById('exit-quiz-title').textContent = `Module ${activeModuleIdx + 1} Exit Quiz`;
-
-    feedback.classList.add('hidden');
-    feedback.textContent = '';
-
-    body.innerHTML = quiz.map((q, qIdx) => `
-      <div class="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
-        <div class="text-sm font-semibold text-zinc-100">${qIdx + 1}. ${q.question}</div>
-        <div class="mt-3 space-y-2">
-          ${(q.options || []).map((opt, oIdx) => `
-            <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-800 bg-zinc-950/20 p-3 text-sm text-zinc-200 transition-all hover:bg-zinc-900">
-              <input type="radio" name="exit-q-${qIdx}" value="${oIdx}" class="mt-1">
-              <span>${opt}</span>
-            </label>
-          `).join('')}
-        </div>
-      </div>
-    `).join('');
-
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-  }
-
-  function closeExitQuiz() {
-    const modal = document.getElementById('exit-quiz-modal');
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-  }
-
-  async function submitExitQuiz() {
-    const mod = SYLLABUS[activeModuleIdx];
-    const quiz = getExitQuiz(mod);
-
-    const answers = quiz.map((_, qIdx) => {
-      const selected = document.querySelector(`input[name="exit-q-${qIdx}"]:checked`);
-      return selected ? Number(selected.value) : -1;
-    });
-
-    const feedbackEl = document.getElementById('exit-quiz-feedback');
-    feedbackEl.classList.add('hidden');
-
-    try {
-      const response = await fetch(`/course/${COURSE_ID}/verify-module`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ moduleIndex: activeModuleIdx, answers })
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || 'Failed to verify module mastery');
-
-      if (data.passed) {
-        completedModules = Number.isInteger(data.completed_modules) ? data.completed_modules : completedModules + 1;
-        triggerConfetti();
-        closeExitQuiz();
-        renderMindMap();
-        renderModulePanel(Math.min(completedModules, SYLLABUS.length - 1));
-      } else {
-        feedbackEl.classList.remove('hidden');
-        feedbackEl.className = 'mt-5 rounded-xl border border-red-900 bg-red-950/30 p-4 text-sm text-red-200';
-        feedbackEl.innerHTML = `
-          <div class="font-semibold">Not yet — try again.</div>
-          <div class="mt-1">${data.feedbackText || 'Review the lesson and retry.'}</div>
-        `;
-      }
-    } catch (err) {
-      feedbackEl.classList.remove('hidden');
-      feedbackEl.className = 'mt-5 rounded-xl border border-red-900 bg-red-950/30 p-4 text-sm text-red-200';
-      feedbackEl.textContent = err.message || 'Failed to submit quiz.';
-    }
-  }
-
-  // Voice / tutor chat (simplified)
-  function setupVoiceInteraction() {
-    const inputEl = document.getElementById('tutor-input');
-    const micBtn = document.getElementById('mic-btn');
-    const listeningBadge = document.getElementById('listening-badge');
-    const unsupportedText = document.getElementById('voice-unsupported');
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const supportsSTT = typeof SpeechRecognition === 'function';
-
-    if (!supportsSTT) {
-      if (micBtn) micBtn.classList.add('hidden');
-      if (unsupportedText) unsupportedText.classList.remove('hidden');
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    let listening = false;
-
-    recognition.addEventListener('result', (event) => {
-      const transcript = event.results[0][0].transcript;
-      inputEl.value = transcript;
-      setTimeout(() => {
-        if (inputEl.value.trim()) {
-          document.getElementById('tutor-form').requestSubmit();
+        // 2. PARSE INITIAL DATA
+        let lessonData = null;
+        try {
+            const rawData = document.getElementById('lesson-data-json').textContent;
+            lessonData = JSON.parse(rawData);
+        } catch (e) {
+            console.error("Failed to parse lesson data", e);
         }
-      }, 250);
-    });
 
-    recognition.addEventListener('start', () => {
-      listening = true;
-      micBtn.classList.add('text-red-300');
-      listeningBadge.classList.remove('hidden');
-    });
-
-    recognition.addEventListener('end', () => {
-      listening = false;
-      micBtn.classList.remove('text-red-300');
-      listeningBadge.classList.add('hidden');
-    });
-
-    micBtn.addEventListener('click', () => {
-      if (listening) {
-        recognition.stop();
-      } else {
-        recognition.start();
-      }
-    });
-  }
-
-  function createTutorBubble(text, role) {
-    const wrapper = document.createElement('div');
-    wrapper.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
-
-    const bubble = document.createElement('div');
-    bubble.className =
-      'max-w-[85%] rounded-lg border px-3 py-2 text-sm leading-relaxed ' +
-      (role === 'user'
-        ? 'border-zinc-700 bg-zinc-950/70 text-zinc-100'
-        : 'border-zinc-800 bg-zinc-900/40 text-zinc-100');
-
-    bubble.innerHTML = role === 'ai' ? marked.parse(text || '') : (text || '');
-
-    wrapper.appendChild(bubble);
-    return wrapper;
-  }
-
-  function setupTutorChat() {
-    const form = document.getElementById('tutor-form');
-    const input = document.getElementById('tutor-input');
-    const messages = document.getElementById('tutor-messages');
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const question = (input.value || '').trim();
-      if (!question) return;
-
-      messages.appendChild(createTutorBubble(question, 'user'));
-      input.value = '';
-
-      const pending = createTutorBubble('Thinking... 🤔', 'ai');
-      messages.appendChild(pending);
-      pending.scrollIntoView({ behavior: 'smooth', block: 'end' });
-
-      try {
-        const response = await fetch(`/course/${COURSE_ID}/tutor`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            question,
-            lessonTopic: currentLesson ? currentLesson.title : '',
-            lessonText: currentLesson ? document.getElementById('card-content').innerText : ''
-          })
+        // 3. EVENT LISTENERS
+        document.querySelectorAll('.module-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const index = this.getAttribute('data-index');
+                loadModule(index);
+            });
         });
+        
+        // State
+        let currentIndex = 0;
+        let isListening = false;
+        let recognition = null;
 
-        const data = await response.json();
-        if (!response.ok) throw new Error(data?.error || 'Failed to get tutor response');
+        // 4. MAIN RENDER FUNCTION
+        function renderCard() {
+            if (!lessonData || !lessonData.cards || lessonData.cards.length === 0) {
+                document.getElementById('card-content').innerHTML = `
+                    <div class="text-center py-10">
+                        <h3 class="text-xl font-bold text-white mb-2">Ready to Learn?</h3>
+                        <p class="text-zinc-400 mb-6">Select a module from the sidebar to generate your first lesson.</p>
+                    </div>
+                `;
+                return;
+            }
 
-        pending.replaceWith(createTutorBubble(data.answer || '', 'ai'));
-      } catch (err) {
-        pending.replaceWith(createTutorBubble('Sorry — I could not answer that. Please try again.', 'ai'));
-        console.error(err);
-      }
-    });
-  }
+            const card = lessonData.cards[currentIndex];
+            const container = document.getElementById('card-content');
+            
+            // Update UI
+            document.getElementById('card-index').innerText = currentIndex + 1;
+            document.getElementById('card-total').innerText = lessonData.cards.length;
+            document.getElementById('progress-bar').style.width = `${((currentIndex + 1) / lessonData.cards.length) * 100}%`;
 
-  renderMindMap();
-  renderModulePanel(selectedModuleIndex);
-  setupVoiceInteraction();
-  setupTutorChat();
-</script>
+            let html = '';
+
+            // --- TEMPLATES ---
+            if (card.type === 'text') {
+                html = `
+                    <div class="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <span class="text-xs font-bold text-indigo-400 tracking-wider uppercase mb-3 block">Topic Overview</span>
+                        <h2 class="text-3xl font-bold text-white mb-6 leading-tight">${lessonData.title}</h2>
+                        <div class="prose prose-invert prose-lg text-zinc-300">
+                            ${marked.parse(card.content)}
+                        </div>
+                    </div>
+                `;
+            } else if (card.type === 'chart') {
+                html = `
+                    <div class="animate-in fade-in zoom-in-95 duration-500">
+                        <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                            <i class="lucide-git-branch w-5 h-5 mr-2 text-indigo-400"></i> Visual Concept
+                        </h3>
+                        <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-6 flex justify-center overflow-x-auto custom-scrollbar">
+                            <div class="mermaid text-center">${card.content}</div>
+                        </div>
+                        <p class="text-center text-xs text-zinc-500 mt-4">Flowchart generated by AI</p>
+                    </div>
+                `;
+            } else if (card.type === 'quiz') {
+                html = `
+                    <div class="animate-in fade-in slide-in-from-right-4 duration-500">
+                        <div class="bg-indigo-500/5 border border-indigo-500/20 rounded-2xl p-6 md:p-8">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 mb-4 border border-indigo-500/20">
+                                <i class="lucide-brain-circuit w-3 h-3 mr-1"></i> Quick Quiz
+                            </span>
+                            <h3 class="text-xl md:text-2xl font-bold text-white mb-8">${card.question}</h3>
+                            <div class="space-y-3">
+                                ${card.options.map(opt => `
+                                    <button onclick="checkAnswer(this, '${opt.replace(/'/g, "\\'")}', '${card.answer.replace(/'/g, "\\'")}')" 
+                                        class="w-full text-left p-4 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 hover:border-zinc-600 transition-all duration-200 flex items-center justify-between group">
+                                        <span class="text-zinc-300 group-hover:text-white font-medium">${opt}</span>
+                                        <div class="w-5 h-5 rounded-full border-2 border-zinc-600 group-hover:border-zinc-400 flex items-center justify-center">
+                                            <div class="w-2.5 h-2.5 rounded-full bg-white opacity-0 transition-opacity check-dot"></div>
+                                        </div>
+                                    </button>
+                                `).join('')}
+                            </div>
+                            <div id="feedback-msg" class="mt-6 p-4 rounded-lg hidden text-sm font-medium animate-in fade-in slide-in-from-top-2"></div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
+            lucide.createIcons();
+
+            if (card.type === 'chart') {
+                setTimeout(() => {
+                    mermaid.init(undefined, document.querySelectorAll('.mermaid'));
+                }, 100);
+            }
+        }
+
+        // 5. FETCH NEW MODULE
+        async function loadModule(index) {
+            const container = document.getElementById('card-content');
+            const sidebarItems = document.querySelectorAll('.module-item');
+
+            // 1. Loading UI
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-64 animate-in fade-in">
+                    <div class="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <h3 class="text-xl font-bold text-white">Generating Module ${parseInt(index) + 1}...</h3>
+                    <p class="text-zinc-400">The AI is crafting your lesson cards.</p>
+                </div>
+            `;
+
+            // 2. Visual Updates (Sidebar)
+            sidebarItems.forEach(item => {
+                item.classList.remove('bg-indigo-500/5', 'border-indigo-500/30', 'shadow-[0_0_15px_-3px_rgba(99,102,241,0.1)]');
+                item.classList.add('bg-zinc-900/30', 'border-zinc-800/50');
+                const label = item.querySelector('span');
+                if(label) label.classList.replace('text-indigo-400', 'text-zinc-500');
+            });
+
+            const activeItem = document.querySelector(`.module-item[data-index="${index}"]`);
+            if (activeItem) {
+                activeItem.classList.remove('bg-zinc-900/30', 'border-zinc-800/50');
+                activeItem.classList.add('bg-indigo-500/5', 'border-indigo-500/30', 'shadow-[0_0_15px_-3px_rgba(99,102,241,0.1)]');
+                const label = activeItem.querySelector('span');
+                if(label) label.classList.replace('text-zinc-500', 'text-indigo-400');
+            }
+
+            try {
+                // 3. Fetch from API
+                const response = await fetch('/api/generate-lesson', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ courseId: courseId, moduleIndex: index })
+                });
+                const data = await response.json();
+
+                if (data.error) throw new Error(data.error);
+
+                // 4. Update & Render
+                lessonData = data;
+                currentIndex = 0;
+                renderCard();
+
+            } catch (error) {
+                console.error(error);
+                container.innerHTML = `
+                    <div class="text-center py-10">
+                        <div class="inline-flex p-3 rounded-full bg-red-500/10 text-red-400 mb-4"><i class="lucide-alert-circle w-8 h-8"></i></div>
+                        <h3 class="text-xl font-bold text-white">Oops!</h3>
+                        <p class="text-zinc-400">${error.message || "Failed to load module."}</p>
+                        <button onclick="loadModule(${index})" class="mt-4 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-sm transition">Try Again</button>
+                    </div>
+                `;
+                lucide.createIcons();
+            }
+        }
+
+        // 6. NAVIGATION & INTERACTION
+        function nextCard() {
+            if (lessonData && currentIndex < lessonData.cards.length - 1) {
+                currentIndex++;
+                renderCard();
+            } else {
+                if (typeof confetti === 'function') confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                setTimeout(() => {
+                    alert("🎉 Module Complete! Moving to dashboard...");
+                    window.location.href = '/dashboard';
+                }, 1500);
+            }
+        }
+
+        function prevCard() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                renderCard();
+            }
+        }
+
+        function checkAnswer(btn, selected, correct) {
+            const feedback = document.getElementById('feedback-msg');
+            const allBtns = btn.parentElement.querySelectorAll('button');
+            allBtns.forEach(b => {
+                b.disabled = true;
+                b.classList.add('opacity-50', 'cursor-not-allowed');
+            });
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            feedback.classList.remove('hidden', 'bg-green-500/10', 'text-green-400', 'bg-red-500/10', 'text-red-400');
+
+            if (selected === correct) {
+                btn.classList.add('bg-green-500/20', 'border-green-500/50', 'ring-1', 'ring-green-500/50');
+                btn.querySelector('.check-dot').classList.add('bg-green-400', 'opacity-100');
+                feedback.classList.add('bg-green-500/10', 'text-green-400', 'border', 'border-green-500/20');
+                feedback.innerHTML = `<div class="flex items-center"><i class="lucide-check-circle-2 w-5 h-5 mr-2"></i> Correct!</div>`;
+                if (typeof confetti === 'function') confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });
+            } else {
+                btn.classList.add('bg-red-500/20', 'border-red-500/50', 'ring-1', 'ring-red-500/50');
+                feedback.classList.add('bg-red-500/10', 'text-red-400', 'border', 'border-red-500/20');
+                feedback.innerHTML = `<div class="flex items-center"><i class="lucide-x-circle w-5 h-5 mr-2"></i> Incorrect. Answer: <strong>${correct}</strong>.</div>`;
+            }
+            lucide.createIcons();
+        }
+
+        // 7. VOICE INPUT
+        function toggleVoice() {
+            if (!('webkitSpeechRecognition' in window)) {
+                alert("Voice input is not supported in this browser. Try Chrome.");
+                return;
+            }
+            if (isListening) { recognition.stop(); return; }
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.onstart = () => {
+                isListening = true;
+                document.getElementById('mic-pulse').classList.remove('hidden');
+                document.getElementById('tutor-input').placeholder = "Listening...";
+            };
+            recognition.onend = () => {
+                isListening = false;
+                document.getElementById('mic-pulse').classList.add('hidden');
+                document.getElementById('tutor-input').placeholder = "Ask the AI Tutor...";
+            };
+            recognition.onresult = (event) => {
+                document.getElementById('tutor-input').value = event.results[0][0].transcript;
+            };
+            recognition.start();
+        }
+
+        async function askTutor(e) {
+            e.preventDefault();
+            const input = document.getElementById('tutor-input');
+            const question = input.value;
+            if(!question) return;
+            input.value = "Thinking...";
+            input.disabled = true;
+            setTimeout(() => {
+                input.value = "";
+                input.disabled = false;
+                input.placeholder = "Ask another question...";
+                const utterance = new SpeechSynthesisUtterance("That is a great question! Let me explain...");
+                window.speechSynthesis.speak(utterance);
+                alert("AI Tutor: That is a great question!");
+            }, 1500);
+        }
+
+        // CONFETTI SCRIPT
+        const script = document.createElement('script');
+        script.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js";
+        document.head.appendChild(script);
+
+        // START
+        renderCard();
+    </script>
+</body>
+</html>
