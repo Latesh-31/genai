@@ -63,6 +63,80 @@
       <div id="content-display" class="hidden">
         <h1 id="lesson-title" class="mb-6 text-3xl font-bold text-zinc-100"></h1>
         <div id="lesson-body" class="prose prose-invert prose-zinc max-w-none"></div>
+
+        <section id="tutor-section" class="mt-10 border-t border-zinc-800 pt-6">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-sm font-semibold text-zinc-200">AI Tutor</h2>
+
+            <div class="flex items-center gap-2">
+              <span id="listening-badge" class="hidden rounded-full border border-red-900 bg-red-950/30 px-2 py-0.5 text-xs text-red-300">
+                Listening...
+              </span>
+
+              <span id="speaking-indicator" class="hidden items-center gap-2 rounded-full border border-indigo-900 bg-indigo-950/30 px-2 py-0.5 text-xs text-indigo-300">
+                <span class="flex items-end gap-0.5" aria-hidden="true">
+                  <span class="h-1 w-0.5 animate-pulse rounded bg-indigo-400"></span>
+                  <span class="h-2 w-0.5 animate-pulse rounded bg-indigo-400"></span>
+                  <span class="h-3 w-0.5 animate-pulse rounded bg-indigo-400"></span>
+                  <span class="h-2 w-0.5 animate-pulse rounded bg-indigo-400"></span>
+                  <span class="h-1 w-0.5 animate-pulse rounded bg-indigo-400"></span>
+                </span>
+                Speaking...
+              </span>
+
+              <span id="voice-unsupported" class="hidden text-xs text-zinc-500">Voice not supported</span>
+            </div>
+          </div>
+
+          <div id="tutor-messages" class="mt-4 space-y-3"></div>
+
+          <form id="tutor-form" class="mt-4 flex items-center gap-2">
+            <input
+              id="tutor-input"
+              name="question"
+              type="text"
+              autocomplete="off"
+              placeholder="Ask the AI tutor about this lesson..."
+              class="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+
+            <button
+              id="mic-btn"
+              type="button"
+              class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950/40 text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              title="Speak"
+              aria-label="Speak"
+            >
+              <svg id="mic-icon" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z" />
+                <path d="M19 11a7 7 0 0 1-14 0" />
+                <path d="M12 18v3" />
+                <path d="M8 21h8" />
+              </svg>
+            </button>
+
+            <button
+              id="tts-stop-btn"
+              type="button"
+              class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950/40 text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              title="Stop speaking"
+              aria-label="Stop speaking"
+            >
+              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+                <path d="M23 9 17 15" />
+                <path d="M17 9 23 15" />
+              </svg>
+            </button>
+
+            <button
+              type="submit"
+              class="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white transition-colors hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+            >
+              Send
+            </button>
+          </form>
+        </section>
       </div>
     </div>
   </main>
@@ -70,23 +144,314 @@
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
+  const COURSE_ID = <%= Number(course.id) %>;
+
+  const voiceUI = {
+    listening: false,
+    recognition: null,
+    inputEl: null,
+    micBtn: null,
+    micIcon: null,
+    listeningBadge: null,
+    speakingIndicator: null,
+    stopBtn: null,
+    unsupportedText: null
+  };
+
+  const tutorState = {
+    lessonTopic: '',
+    lessonText: ''
+  };
+
+  function setListening(isListening) {
+    voiceUI.listening = isListening;
+
+    if (!voiceUI.micBtn || !voiceUI.micIcon || !voiceUI.listeningBadge) return;
+
+    if (isListening) {
+      voiceUI.micBtn.classList.add('text-red-300');
+      voiceUI.micBtn.classList.remove('text-zinc-400');
+      voiceUI.micIcon.classList.add('animate-pulse');
+      voiceUI.listeningBadge.classList.remove('hidden');
+    } else {
+      voiceUI.micBtn.classList.remove('text-red-300');
+      voiceUI.micBtn.classList.add('text-zinc-400');
+      voiceUI.micIcon.classList.remove('animate-pulse');
+      voiceUI.listeningBadge.classList.add('hidden');
+    }
+  }
+
+  function setSpeaking(isSpeaking) {
+    if (!voiceUI.speakingIndicator) return;
+
+    if (isSpeaking) {
+      voiceUI.speakingIndicator.classList.remove('hidden');
+      voiceUI.speakingIndicator.classList.add('inline-flex');
+    } else {
+      voiceUI.speakingIndicator.classList.add('hidden');
+      voiceUI.speakingIndicator.classList.remove('inline-flex');
+    }
+  }
+
+  function getSpeakableText(text) {
+    if (typeof text !== 'string') return '';
+    return text
+      .replace(/\s+/g, ' ')
+      .replace(/[#*_`>\[\]()-]/g, ' ')
+      .trim();
+  }
+
+  function pickPreferredVoice() {
+    if (!('speechSynthesis' in window)) return null;
+
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || !voices.length) return null;
+
+    return (
+      voices.find((v) => v.name && v.name.toLowerCase().includes('google us english')) ||
+      voices.find((v) => v.lang === 'en-US') ||
+      voices.find((v) => v.lang && v.lang.toLowerCase().startsWith('en')) ||
+      voices[0]
+    );
+  }
+
+  let preferredVoice = null;
+
+  function speakText(text) {
+    if (!('speechSynthesis' in window) || typeof window.SpeechSynthesisUtterance !== 'function') return;
+
+    const speakable = getSpeakableText(text);
+    if (!speakable) return;
+
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(speakable);
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.lang = 'en-US';
+
+    if (!preferredVoice) preferredVoice = pickPreferredVoice();
+    if (preferredVoice) utterance.voice = preferredVoice;
+
+    utterance.onstart = () => setSpeaking(true);
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function stopSpeaking() {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    setSpeaking(false);
+  }
+
+  function setupVoiceInteraction() {
+    voiceUI.inputEl = document.getElementById('tutor-input');
+    voiceUI.micBtn = document.getElementById('mic-btn');
+    voiceUI.micIcon = document.getElementById('mic-icon');
+    voiceUI.listeningBadge = document.getElementById('listening-badge');
+    voiceUI.speakingIndicator = document.getElementById('speaking-indicator');
+    voiceUI.stopBtn = document.getElementById('tts-stop-btn');
+    voiceUI.unsupportedText = document.getElementById('voice-unsupported');
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const supportsSTT = typeof SpeechRecognition === 'function';
+    const supportsTTS = 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance === 'function';
+
+    if (!supportsSTT && voiceUI.micBtn) {
+      voiceUI.micBtn.classList.add('hidden');
+    }
+
+    if (!supportsTTS && voiceUI.stopBtn) {
+      voiceUI.stopBtn.classList.add('hidden');
+    }
+
+    if (voiceUI.unsupportedText) {
+      if (!supportsSTT) {
+        voiceUI.unsupportedText.textContent = 'Mic not supported';
+        voiceUI.unsupportedText.classList.remove('hidden');
+      } else if (!supportsTTS) {
+        voiceUI.unsupportedText.textContent = 'Speech not supported';
+        voiceUI.unsupportedText.classList.remove('hidden');
+      }
+    }
+
+    if (supportsTTS) {
+      preferredVoice = pickPreferredVoice();
+      window.speechSynthesis.addEventListener('voiceschanged', () => {
+        preferredVoice = pickPreferredVoice();
+      });
+    }
+
+    if (voiceUI.stopBtn) {
+      voiceUI.stopBtn.addEventListener('click', stopSpeaking);
+    }
+
+    if (!supportsSTT) return;
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.maxAlternatives = 1;
+
+    const AUTO_SUBMIT_AFTER_VOICE = false;
+    let autoSubmitTimer = null;
+
+    recognition.addEventListener('start', () => {
+      if (autoSubmitTimer) {
+        clearTimeout(autoSubmitTimer);
+        autoSubmitTimer = null;
+      }
+
+      stopSpeaking();
+      setListening(true);
+    });
+
+    recognition.addEventListener('end', () => {
+      setListening(false);
+    });
+
+    recognition.addEventListener('error', () => {
+      setListening(false);
+    });
+
+    recognition.addEventListener('result', (event) => {
+      if (!voiceUI.inputEl) return;
+
+      let transcript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+
+      voiceUI.inputEl.value = transcript.trim();
+
+      const lastResult = event.results[event.results.length - 1];
+      const isFinal = !!lastResult?.isFinal;
+
+      if (autoSubmitTimer) clearTimeout(autoSubmitTimer);
+      if (isFinal && AUTO_SUBMIT_AFTER_VOICE) {
+        autoSubmitTimer = setTimeout(() => {
+          const form = document.getElementById('tutor-form');
+          if (form && voiceUI.inputEl && voiceUI.inputEl.value.trim()) {
+            if (typeof form.requestSubmit === 'function') {
+              form.requestSubmit();
+            } else {
+              form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            }
+          }
+        }, 900);
+      }
+    });
+
+    voiceUI.recognition = recognition;
+
+    if (voiceUI.micBtn) {
+      voiceUI.micBtn.addEventListener('click', () => {
+        if (!voiceUI.recognition) return;
+
+        if (voiceUI.listening) {
+          voiceUI.recognition.stop();
+          return;
+        }
+
+        try {
+          voiceUI.recognition.start();
+        } catch (_) {
+          voiceUI.recognition.stop();
+        }
+      });
+    }
+
+  }
+
+  function createTutorBubble(text, role) {
+    const wrapper = document.createElement('div');
+    wrapper.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
+
+    const bubble = document.createElement('div');
+    bubble.className =
+      'max-w-[85%] rounded-lg border px-3 py-2 text-sm leading-relaxed ' +
+      (role === 'user'
+        ? 'border-zinc-700 bg-zinc-950/70 text-zinc-100'
+        : 'border-zinc-800 bg-zinc-900/40 text-zinc-100');
+
+    if (role === 'ai') {
+      bubble.innerHTML = marked.parse(text || '');
+    } else {
+      bubble.textContent = text;
+    }
+
+    wrapper.appendChild(bubble);
+    return wrapper;
+  }
+
+  function setupTutorChat() {
+    const form = document.getElementById('tutor-form');
+    const input = document.getElementById('tutor-input');
+    const messages = document.getElementById('tutor-messages');
+
+    if (!form || !input || !messages) return;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const question = (input.value || '').trim();
+      if (!question) return;
+
+      messages.appendChild(createTutorBubble(question, 'user'));
+      input.value = '';
+
+      const pending = createTutorBubble('Thinking...', 'ai');
+      messages.appendChild(pending);
+      pending.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+      try {
+        const response = await fetch(`/course/${COURSE_ID}/tutor`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question,
+            lessonTopic: tutorState.lessonTopic,
+            lessonText: tutorState.lessonText
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.error || 'Failed to get tutor response');
+
+        pending.replaceWith(createTutorBubble(data.answer || '', 'ai'));
+
+        const temp = document.createElement('div');
+        temp.innerHTML = marked.parse(data.answer || '');
+        speakText(temp.innerText);
+      } catch (err) {
+        pending.replaceWith(createTutorBubble('Sorry — I could not answer that. Please try again.', 'ai'));
+        console.error(err);
+      }
+    });
+  }
+
   async function loadLesson(courseId, moduleIdx, topicIdx) {
     const emptyState = document.getElementById('empty-state');
     const loadingState = document.getElementById('loading-state');
     const contentDisplay = document.getElementById('content-display');
     const titleEl = document.getElementById('lesson-title');
     const bodyEl = document.getElementById('lesson-body');
-    
-    // UI Update
+    const messages = document.getElementById('tutor-messages');
+
+    stopSpeaking();
+
     emptyState.classList.add('hidden');
     contentDisplay.classList.add('hidden');
     loadingState.classList.remove('hidden');
 
-    // Highlight active button
     document.querySelectorAll('button[id^="btn-"]').forEach(btn => {
       btn.classList.remove('bg-zinc-800', 'text-zinc-100', 'font-medium');
       btn.classList.add('text-zinc-400');
     });
+
     const activeBtn = document.getElementById(`btn-${moduleIdx}-${topicIdx}`);
     if (activeBtn) {
       activeBtn.classList.add('bg-zinc-800', 'text-zinc-100', 'font-medium');
@@ -96,14 +461,20 @@
     try {
       const response = await fetch(`/course/${courseId}/lesson/${moduleIdx}/${topicIdx}`);
       if (!response.ok) throw new Error('Failed to load lesson');
-      
+
       const data = await response.json();
-      
+
       titleEl.textContent = data.topic;
       bodyEl.innerHTML = marked.parse(data.content);
-      
+
+      tutorState.lessonTopic = data.topic || '';
+      tutorState.lessonText = bodyEl.innerText || '';
+      if (messages) messages.innerHTML = '';
+
       loadingState.classList.add('hidden');
       contentDisplay.classList.remove('hidden');
+
+      speakText(`${data.topic}. ${tutorState.lessonText}`);
     } catch (err) {
       console.error(err);
       loadingState.classList.add('hidden');
@@ -112,4 +483,7 @@
       emptyState.querySelector('p').textContent = 'Please try again.';
     }
   }
+
+  setupVoiceInteraction();
+  setupTutorChat();
 </script>

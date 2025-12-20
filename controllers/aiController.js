@@ -224,9 +224,44 @@ async function generateLesson(topic, userLevel) {
   return cleanText;
 }
 
+async function generateTutorResponse({ question, courseTopic, userLevel, lessonTopic, lessonText }) {
+  const model = getModel();
+
+  const context = typeof lessonText === 'string' ? lessonText.slice(0, 6000) : '';
+
+  const prompt = [
+    'You are AdaptLearn AI Tutor.',
+    'Answer the user question clearly and concisely.',
+    'Use Markdown formatting.',
+    'If the question is ambiguous, ask 1 short clarifying question and still provide a best-effort answer.',
+    `Course topic: ${courseTopic || ''}`,
+    `Student level: ${userLevel || ''}`,
+    lessonTopic ? `Current lesson topic: ${lessonTopic}` : '',
+    context ? `Lesson context:\n${context}` : '',
+    `User question: ${question}`
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
+  const result = await model.generateContent(prompt);
+  const text = result?.response?.text?.() || '';
+
+  if (!text) throw new Error('AI failed to generate tutor response');
+
+  let cleanText = text.trim();
+  if (cleanText.startsWith('```markdown')) {
+    cleanText = cleanText.replace(/^```markdown\s*/i, '').replace(/\s*```$/i, '');
+  } else if (cleanText.startsWith('```') && !cleanText.includes('\n```', 4)) {
+    cleanText = cleanText.replace(/^```\s*/i, '').replace(/\s*```$/i, '');
+  }
+
+  return cleanText;
+}
+
 module.exports = {
   generateQuiz,
   gradeQuiz,
   evaluateAndCreateSyllabus,
-  generateLesson
+  generateLesson,
+  generateTutorResponse
 };
