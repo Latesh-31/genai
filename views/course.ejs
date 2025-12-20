@@ -42,10 +42,11 @@
     </div>
   </aside>
 
-  <!-- Main Content -->
-  <main class="flex-1 overflow-y-auto bg-zinc-900/30 p-8 sm:p-12">
-    <div id="lesson-container" class="mx-auto max-w-3xl">
-      <div id="empty-state" class="flex flex-col items-center justify-center py-20 text-center">
+  <!-- Main Content Card Deck Interface -->
+  <main class="flex-1 overflow-hidden bg-zinc-900/30">
+    <div id="lesson-container" class="relative h-full w-full">
+      <!-- Empty State -->
+      <div id="empty-state" class="flex h-full flex-col items-center justify-center py-20 text-center">
         <div class="mb-4 rounded-full bg-zinc-900 p-4 ring-1 ring-zinc-800">
           <svg class="h-8 w-8 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -55,97 +56,457 @@
         <p class="mt-2 text-zinc-500">Choose a lesson from the syllabus on the left.</p>
       </div>
 
-      <div id="loading-state" class="hidden py-20 text-center">
-        <div class="inline-block h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500"></div>
-        <p class="mt-4 text-sm text-zinc-400">Generating lesson with AI...</p>
+      <!-- Loading State -->
+      <div id="loading-state" class="hidden flex h-full items-center justify-center">
+        <div class="text-center">
+          <div class="inline-block h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500"></div>
+          <p class="mt-4 text-sm text-zinc-400">Generating lesson with AI 🚀</p>
+        </div>
       </div>
 
-      <div id="content-display" class="hidden">
-        <h1 id="lesson-title" class="mb-6 text-3xl font-bold text-zinc-100"></h1>
-        <div id="lesson-body" class="prose prose-invert prose-zinc max-w-none"></div>
+      <!-- Card Deck Interface -->
+      <div id="card-deck" class="hidden h-full w-full p-8 sm:p-12">
+        <!-- Progress Bar -->
+        <div class="mb-8">
+          <div class="mb-2 flex justify-between text-sm text-zinc-400">
+            <span id="card-progress-label">Card 1 of X</span>
+            <span>Progress</span>
+          </div>
+          <div class="h-2 w-full rounded-full bg-zinc-800">
+            <div id="progress-bar" class="h-full rounded-full bg-gradient-to-r from-green-400 to-emerald-400 transition-all duration-300" style="width: 10%"></div>
+          </div>
+        </div>
 
-        <section id="tutor-section" class="mt-10 border-t border-zinc-800 pt-6">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <h2 class="text-sm font-semibold text-zinc-200">AI Tutor</h2>
-
-            <div class="flex items-center gap-2">
-              <span id="listening-badge" class="hidden rounded-full border border-red-900 bg-red-950/30 px-2 py-0.5 text-xs text-red-300">
-                Listening...
-              </span>
-
-              <span id="speaking-indicator" class="hidden items-center gap-2 rounded-full border border-indigo-900 bg-indigo-950/30 px-2 py-0.5 text-xs text-indigo-300">
-                <span class="flex items-end gap-0.5" aria-hidden="true">
-                  <span class="h-1 w-0.5 animate-pulse rounded bg-indigo-400"></span>
-                  <span class="h-2 w-0.5 animate-pulse rounded bg-indigo-400"></span>
-                  <span class="h-3 w-0.5 animate-pulse rounded bg-indigo-400"></span>
-                  <span class="h-2 w-0.5 animate-pulse rounded bg-indigo-400"></span>
-                  <span class="h-1 w-0.5 animate-pulse rounded bg-indigo-400"></span>
-                </span>
-                Speaking...
-              </span>
-
-              <span id="voice-unsupported" class="hidden text-xs text-zinc-500">Voice not supported</span>
-            </div>
+        <!-- Current Card Display -->
+        <div id="card-container" class="mx-auto max-w-3xl">
+          <h1 id="lesson-title" class="mb-6 text-3xl font-bold text-zinc-100"></h1>
+          
+          <!-- Card Content -->
+          <div id="card-content" class="relative rounded-xl border border-zinc-800 bg-zinc-900/50 p-8 shadow-2xl">
+            <!-- Card Content Will Be Inserted Here -->
           </div>
 
-          <div id="tutor-messages" class="mt-4 space-y-3"></div>
-
-          <form id="tutor-form" class="mt-4 flex items-center gap-2">
-            <input
-              id="tutor-input"
-              name="question"
-              type="text"
-              autocomplete="off"
-              placeholder="Ask the AI tutor about this lesson..."
-              class="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            />
-
-            <button
-              id="mic-btn"
-              type="button"
-              class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950/40 text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              title="Speak"
-              aria-label="Speak"
-            >
-              <svg id="mic-icon" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z" />
-                <path d="M19 11a7 7 0 0 1-14 0" />
-                <path d="M12 18v3" />
-                <path d="M8 21h8" />
-              </svg>
+          <!-- Navigation Buttons -->
+          <div class="mt-6 flex justify-between">
+            <button id="prev-btn" class="rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-700 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50" disabled>
+              ← Previous
             </button>
-
-            <button
-              id="tts-stop-btn"
-              type="button"
-              class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950/40 text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              title="Stop speaking"
-              aria-label="Stop speaking"
-            >
-              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M11 5 6 9H3v6h3l5 4V5Z" />
-                <path d="M23 9 17 15" />
-                <path d="M17 9 23 15" />
-              </svg>
+            <button id="next-btn" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50" disabled>
+              Next →
             </button>
+          </div>
+        </div>
 
-            <button
-              type="submit"
-              class="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white transition-colors hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-            >
-              Send
-            </button>
-          </form>
-        </section>
+        <!-- Completion Celebration -->
+        <div id="completion-celebration" class="hidden absolute inset-0 flex items-center justify-center bg-zinc-900/90 backdrop-blur-sm">
+          <div class="text-center">
+            <div class="mb-4 text-6xl">🎉</div>
+            <h2 class="mb-2 text-3xl font-bold text-green-400">Lesson Complete! 🥳</h2>
+            <p class="mb-4 text-lg text-zinc-300">You've earned <span class="font-bold text-yellow-400">+100 XP</span>! 💎</p>
+            <div class="flex justify-center gap-2">
+              <button onclick="closeLesson()" class="rounded-lg bg-indigo-600 px-6 py-3 text-white transition-colors hover:bg-indigo-500">
+                Back to Course
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <!-- AI Tutor Panel (kept from original) -->
+      <section id="tutor-section" class="hidden absolute bottom-0 left-0 right-0 border-t border-zinc-800 bg-zinc-950/95 p-6 backdrop-blur-sm">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="text-sm font-semibold text-zinc-200">AI Tutor</h2>
+
+          <div class="flex items-center gap-2">
+            <span id="listening-badge" class="hidden rounded-full border border-red-900 bg-red-950/30 px-2 py-0.5 text-xs text-red-300">
+              Listening...
+            </span>
+
+            <span id="speaking-indicator" class="hidden items-center gap-2 rounded-full border border-indigo-900 bg-indigo-950/30 px-2 py-0.5 text-xs text-indigo-300">
+              <span class="flex items-end gap-0.5" aria-hidden="true">
+                <span class="h-1 w-0.5 animate-pulse rounded bg-indigo-400"></span>
+                <span class="h-2 w-0.5 animate-pulse rounded bg-indigo-400"></span>
+                <span class="h-3 w-0.5 animate-pulse rounded bg-indigo-400"></span>
+                <span class="h-2 w-0.5 animate-pulse rounded bg-indigo-400"></span>
+                <span class="h-1 w-0.5 animate-pulse rounded bg-indigo-400"></span>
+              </span>
+              Speaking...
+            </span>
+
+            <span id="voice-unsupported" class="hidden text-xs text-zinc-500">Voice not supported</span>
+          </div>
+        </div>
+
+        <div id="tutor-messages" class="mt-4 space-y-3"></div>
+
+        <form id="tutor-form" class="mt-4 flex items-center gap-2">
+          <input
+            id="tutor-input"
+            name="question"
+            type="text"
+            autocomplete="off"
+            placeholder="Ask the AI tutor about this lesson..."
+            class="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+          />
+
+          <button
+            id="mic-btn"
+            type="button"
+            class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950/40 text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            title="Speak"
+            aria-label="Speak"
+          >
+            <svg id="mic-icon" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z" />
+              <path d="M19 11a7 7 0 0 1-14 0" />
+              <path d="M12 18v3" />
+              <path d="M8 21h8" />
+            </svg>
+          </button>
+
+          <button
+            id="tts-stop-btn"
+            type="button"
+            class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950/40 text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            title="Stop speaking"
+            aria-label="Stop speaking"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+              <path d="M23 9 17 15" />
+              <path d="M17 9 23 15" />
+            </svg>
+          </button>
+
+          <button
+            type="submit"
+            class="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white transition-colors hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+          >
+            Send
+          </button>
+        </form>
+      </section>
     </div>
   </main>
 </div>
 
+<!-- Confetti Canvas -->
+<canvas id="confetti-canvas" class="pointer-events-none fixed inset-0 z-50 hidden"></canvas>
+
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
   const COURSE_ID = <%= Number(course.id) %>;
+  
+  let currentLesson = null;
+  let currentCardIndex = 0;
+  let lessonProgress = { completed: false };
 
+  // Card rendering functions
+  function renderTextCard(card) {
+    return `
+      <div class="text-lg text-zinc-100">
+        ${marked.parse(card.content)}
+      </div>
+      ${card.image ? `<img src="${card.image}" alt="Lesson image" class="mt-4 rounded-lg">` : ''}
+    `;
+  }
+
+  function renderQuizCard(card, cardIndex) {
+    return `
+      <div class="text-center">
+        <h3 class="mb-6 text-2xl font-bold text-zinc-100">${card.question}</h3>
+        <div class="grid gap-3" id="quiz-options-${cardIndex}">
+          ${card.options.map((option, idx) => `
+            <button 
+              onclick="selectQuizOption('${card.answer}', '${option}', ${cardIndex}, ${idx})"
+              class="quiz-option rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-zinc-300 transition-all hover:border-zinc-600 hover:bg-zinc-700 hover:text-zinc-100 text-left disabled:cursor-not-allowed"
+            >
+              ${option}
+            </button>
+          `).join('')}
+        </div>
+        <div id="quiz-feedback-${cardIndex}" class="mt-4 hidden rounded-lg p-3 text-sm"></div>
+      </div>
+    `;
+  }
+
+  function renderChallengeCard(card) {
+    return `
+      <div class="text-center">
+        <div class="mb-2 text-4xl">🎯</div>
+        <h3 class="mb-4 text-xl font-bold text-zinc-100">Challenge Time!</h3>
+        <p class="mb-6 text-lg text-zinc-200">${card.prompt}</p>
+        <div class="rounded-lg border border-dashed border-zinc-700 bg-zinc-800/50 p-6 text-center text-zinc-400">
+          💡 Hint: ${card.hint}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCard(card, index) {
+    switch (card.type) {
+      case 'text':
+        return renderTextCard(card);
+      case 'quiz':
+        return renderQuizCard(card, index);
+      case 'challenge':
+        return renderChallengeCard(card);
+      default:
+        return '<div class="text-red-400">Unknown card type</div>';
+    }
+  }
+
+  function updateProgress() {
+    if (!currentLesson) return;
+    
+    const progressLabel = document.getElementById('card-progress-label');
+    const progressBar = document.getElementById('progress-bar');
+    
+    progressLabel.textContent = `Card ${currentCardIndex + 1} of ${currentLesson.cards.length}`;
+    
+    const percentage = ((currentCardIndex + 1) / currentLesson.cards.length) * 100;
+    progressBar.style.width = `${percentage}%`;
+  }
+
+  function selectQuizCard(card, index) {
+    const selectedCard = card;
+  }
+}
+
+function refreshCard() {
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const cardContent = document.getElementById('card-content');
+    const tutorSection = document.getElementById('tutor-section');
+    
+    if (!currentLesson || !currentLesson.cards[currentCardIndex]) return;
+    
+    const card = currentLesson.cards[currentCardIndex];
+    cardContent.innerHTML = renderCard(card, currentCardIndex);
+    
+    // Update navigation buttons
+    prevBtn.disabled = currentCardIndex === 0;
+    
+    // Enable next button for text cards, disable for quiz cards initially
+    if (card.type === 'text' || card.type === 'challenge') {
+      nextBtn.disabled = false;
+      nextBtn.textContent = currentCardIndex === currentLesson.cards.length - 1 ? 'Finish!' : 'Next →';
+    } else {
+      nextBtn.disabled = true;
+      nextBtn.textContent = 'Answer first!';
+    }
+    
+    updateProgress();
+    
+    // Show tutor section for all cards after the first one
+    if (currentCardIndex > 0) {
+      tutorSection.classList.remove('hidden');
+    }
+  }
+
+  function nextCard() {
+    if (currentCardIndex < currentLesson.cards.length - 1) {
+      currentCardIndex++;
+      refreshCard();
+    } else {
+      completeLesson();
+    }
+  }
+
+  function previousCard() {
+    if (currentCardIndex > 0) {
+      currentCardIndex--;
+      refreshCard();
+    }
+  }
+
+  function selectQuizOption(correctAnswer, selectedAnswer, cardIndex, optionIndex) {
+    const options = document.querySelectorAll(`#quiz-options-${cardIndex} .quiz-option`);
+    const feedback = document.getElementById(`quiz-feedback-${cardIndex}`);
+    const nextBtn = document.getElementById('next-btn');
+    
+    // Disable all options
+    options.forEach(opt => opt.disabled = true);
+    
+    // Style the selected option
+    if (selectedAnswer === correctAnswer) {
+      options[optionIndex].classList.add('bg-green-600', 'border-green-500', 'text-white');
+      options[optionIndex].classList.add('animate-bounce');
+      feedback.className = 'mt-4 rounded-lg bg-green-950/30 p-3 text-sm text-green-300';
+      feedback.textContent = '🎉 Correct! ' + currentLesson.cards[cardIndex].explanation;
+      nextBtn.disabled = false;
+      nextBtn.textContent = 'Next →';
+    } else {
+      options[optionIndex].classList.add('bg-red-600', 'border-red-500', 'text-white');
+      // Find and highlight the correct answer
+      options.forEach((opt, idx) => {
+        if (opt.textContent.trim() === correctAnswer) {
+          opt.classList.add('bg-green-600', 'border-green-500', 'text-white');
+        }
+      });
+      feedback.className = 'mt-4 rounded-lg bg-red-950/30 p-3 text-sm text-red-300';
+      feedback.textContent = '💔 Not quite! ' + currentLesson.cards[cardIndex].explanation;
+      nextBtn.disabled = false;
+      nextBtn.textContent = 'Next →';
+    }
+    
+    feedback.classList.remove('hidden');
+}
+
+function completeLesson() {
+    const completionCelebration = document.getElementById('completion-celebration');
+    completionCelebration.classList.remove('hidden');
+    
+    // Trigger confetti
+    triggerConfetti();
+    
+    // Mark lesson as completed
+    lessonProgress.completed = true;
+    
+    // Award XP (this would be sent to the server)
+    awardExperiencePoints(100);
+}
+
+function awardExperiencePoints(points) {
+    // Send to server to update user's XP
+    fetch(`/course/${COURSE_ID}/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+		  body: JSON.stringify({
+	   	  xpEarned: grade.progress.totalPoints
+    })
+  }).catch(err => console.error('Failed to award XP:', err));
+}
+
+function closeLesson() {
+    const emptyState = document.getElementById('empty-state');
+    
+    document.getElementById('card-deck').classList.add('hidden');
+    emptyState.classList.remove('hidden');
+    
+    currentLesson = null;
+    currentCardIndex = 0;
+}
+
+async function loadLesson(courseId, moduleIdx, topicIdx) {
+    const emptyState = document.getElementById('empty-state');
+    const loadingState = document.getElementById('loading-state');
+    const cardDeck = document.getElementById('card-deck');
+    const tutorSection = document.getElementById('tutor-section');
+    
+    emptyState.classList.add('hidden');
+    cardDeck.classList.add('hidden');
+    loadingState.classList.remove('hidden');
+    tutorSection.classList.add('hidden');
+    
+    // Clear tutor messages
+    document.getElementById('tutor-messages').innerHTML = '';
+    
+    // Update active button
+    document.querySelectorAll('button[id^="btn-"]').forEach(btn => {
+      btn.classList.remove('bg-zinc-800', 'text-zinc-100', 'font-medium');
+      btn.classList.add('text-zinc-400');
+    });
+    
+    const activeBtn = document.getElementById(`btn-${moduleIdx}-${topicIdx}`);
+    if (activeBtn) {
+      activeBtn.classList.add('bg-zinc-800', 'text-zinc-100', 'font-medium');
+      btn.classList.remove('text-zinc-400');
+    }
+    
+    try {
+      const response = await fetch(`/course/${courseId}/lesson/${moduleIdx}/${topicIdx}`);
+      if (!response.ok) throw new Error('Failed to load lesson');
+      
+      const data = await response.json();
+      
+      // Setup lesson data
+      currentLesson = {
+        title: data.title,
+        cards: data.cards
+      };
+      currentCardIndex = 0;
+      
+      document.getElementById('lesson-title').textContent = data.title;
+      
+      loadingState.classList.add('hidden');
+      cardDeck.classList.remove('hidden');
+      
+      // Initialize first card
+      refreshCard();
+      
+    } catch (err) {
+      console.error(err);
+      loadingState.classList.add('hidden');
+      emptyState.classList.remove('hidden');
+      emptyState.querySelector('h2').textContent = 'Error loading lesson';
+      emptyState.querySelector('p').textContent = 'Please try again.';
+    }
+  }
+
+  // Event listeners
+  document.getElementById('next-btn').addEventListener('click', nextCard);
+  document.getElementById('prev-btn').addEventListener('click', previousCard);
+
+  // Confetti animation
+  function triggerConfetti() {
+    const canvas = document.getElementById('confetti-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    canvas.classList.remove('hidden');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    const confetti = [];
+    const colors = ['#10b981', '#8b5cf6', '#f59e0b', '#3b82f6', '#ef4444', '#06b6d4'];
+    
+    for (let i = 0; i < 150; i++) {
+      confetti.push({
+        x: Math.random() * canvas.width,
+        y: -Math.random() * 100,
+        vx: Math.random() * 4 - 2,
+        vy: Math.random() * 3 + 2,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        size: Math.random() * 6 + 2,
+        rotation: Math.random() * 360,
+        rotationSpeed: Math.random() * 10 - 5
+      });
+    }
+    
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      confetti.forEach((c, i) => {
+        c.x += c.vx;
+        c.y += c.vy;
+        c.vy += 0.1;
+        c.rotation += c.rotationSpeed;
+        
+        ctx.save();
+        ctx.translate(c.x, c.y);
+        ctx.rotate(c.rotation * Math.PI / 180);
+        ctx.fillStyle = c.color;
+        ctx.fillRect(-c.size/2, -c.size/2, c.size, c.size);
+        ctx.restore();
+        
+        if (c.y > canvas.height + 50) {
+          c.y = -50;
+          c.x = Math.random() * canvas.width;
+        }
+      });
+      
+      requestAnimationFrame(animate);
+    }
+    
+    animate();
+    
+    // Hide confetti after 3 seconds
+    setTimeout(() => {
+      canvas.classList.add('hidden');
+    }, 3000);
+  }
+
+  // Voice interaction setup (from original, simplified)
   const voiceUI = {
     listening: false,
     recognition: null,
@@ -163,207 +524,62 @@
     lessonText: ''
   };
 
-  function setListening(isListening) {
-    voiceUI.listening = isListening;
-
-    if (!voiceUI.micBtn || !voiceUI.micIcon || !voiceUI.listeningBadge) return;
-
-    if (isListening) {
-      voiceUI.micBtn.classList.add('text-red-300');
-      voiceUI.micBtn.classList.remove('text-zinc-400');
-      voiceUI.micIcon.classList.add('animate-pulse');
-      voiceUI.listeningBadge.classList.remove('hidden');
-    } else {
-      voiceUI.micBtn.classList.remove('text-red-300');
-      voiceUI.micBtn.classList.add('text-zinc-400');
-      voiceUI.micIcon.classList.remove('animate-pulse');
-      voiceUI.listeningBadge.classList.add('hidden');
-    }
-  }
-
-  function setSpeaking(isSpeaking) {
-    if (!voiceUI.speakingIndicator) return;
-
-    if (isSpeaking) {
-      voiceUI.speakingIndicator.classList.remove('hidden');
-      voiceUI.speakingIndicator.classList.add('inline-flex');
-    } else {
-      voiceUI.speakingIndicator.classList.add('hidden');
-      voiceUI.speakingIndicator.classList.remove('inline-flex');
-    }
-  }
-
-  function getSpeakableText(text) {
-    if (typeof text !== 'string') return '';
-    return text
-      .replace(/\s+/g, ' ')
-      .replace(/[#*_`>\[\]()-]/g, ' ')
-      .trim();
-  }
-
-  function pickPreferredVoice() {
-    if (!('speechSynthesis' in window)) return null;
-
-    const voices = window.speechSynthesis.getVoices();
-    if (!voices || !voices.length) return null;
-
-    return (
-      voices.find((v) => v.name && v.name.toLowerCase().includes('google us english')) ||
-      voices.find((v) => v.lang === 'en-US') ||
-      voices.find((v) => v.lang && v.lang.toLowerCase().startsWith('en')) ||
-      voices[0]
-    );
-  }
-
-  let preferredVoice = null;
-
-  function speakText(text) {
-    if (!('speechSynthesis' in window) || typeof window.SpeechSynthesisUtterance !== 'function') return;
-
-    const speakable = getSpeakableText(text);
-    if (!speakable) return;
-
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(speakable);
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
-    utterance.lang = 'en-US';
-
-    if (!preferredVoice) preferredVoice = pickPreferredVoice();
-    if (preferredVoice) utterance.voice = preferredVoice;
-
-    utterance.onstart = () => setSpeaking(true);
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
-
-    window.speechSynthesis.speak(utterance);
-  }
-
-  function stopSpeaking() {
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    setSpeaking(false);
-  }
-
   function setupVoiceInteraction() {
     voiceUI.inputEl = document.getElementById('tutor-input');
     voiceUI.micBtn = document.getElementById('mic-btn');
-    voiceUI.micIcon = document.getElementById('mic-icon');
     voiceUI.listeningBadge = document.getElementById('listening-badge');
-    voiceUI.speakingIndicator = document.getElementById('speaking-indicator');
-    voiceUI.stopBtn = document.getElementById('tts-stop-btn');
-    voiceUI.unsupportedText = document.getElementById('voice-unsupported');
-
+    
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const supportsSTT = typeof SpeechRecognition === 'function';
-    const supportsTTS = 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance === 'function';
-
+    
     if (!supportsSTT && voiceUI.micBtn) {
       voiceUI.micBtn.classList.add('hidden');
     }
-
-    if (!supportsTTS && voiceUI.stopBtn) {
-      voiceUI.stopBtn.classList.add('hidden');
-    }
-
-    if (voiceUI.unsupportedText) {
-      if (!supportsSTT) {
-        voiceUI.unsupportedText.textContent = 'Mic not supported';
-        voiceUI.unsupportedText.classList.remove('hidden');
-      } else if (!supportsTTS) {
-        voiceUI.unsupportedText.textContent = 'Speech not supported';
-        voiceUI.unsupportedText.classList.remove('hidden');
-      }
-    }
-
-    if (supportsTTS) {
-      preferredVoice = pickPreferredVoice();
-      window.speechSynthesis.addEventListener('voiceschanged', () => {
-        preferredVoice = pickPreferredVoice();
-      });
-    }
-
-    if (voiceUI.stopBtn) {
-      voiceUI.stopBtn.addEventListener('click', stopSpeaking);
-    }
-
+    
     if (!supportsSTT) return;
-
+    
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
-    recognition.interimResults = true;
     recognition.continuous = false;
-    recognition.maxAlternatives = 1;
-
-    const AUTO_SUBMIT_AFTER_VOICE = false;
-    let autoSubmitTimer = null;
-
-    recognition.addEventListener('start', () => {
-      if (autoSubmitTimer) {
-        clearTimeout(autoSubmitTimer);
-        autoSubmitTimer = null;
-      }
-
-      stopSpeaking();
-      setListening(true);
-    });
-
-    recognition.addEventListener('end', () => {
-      setListening(false);
-    });
-
-    recognition.addEventListener('error', () => {
-      setListening(false);
-    });
-
+    recognition.interimResults = false;
+    
     recognition.addEventListener('result', (event) => {
       if (!voiceUI.inputEl) return;
-
-      let transcript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-      }
-
-      voiceUI.inputEl.value = transcript.trim();
-
-      const lastResult = event.results[event.results.length - 1];
-      const isFinal = !!lastResult?.isFinal;
-
-      if (autoSubmitTimer) clearTimeout(autoSubmitTimer);
-      if (isFinal && AUTO_SUBMIT_AFTER_VOICE) {
-        autoSubmitTimer = setTimeout(() => {
-          const form = document.getElementById('tutor-form');
-          if (form && voiceUI.inputEl && voiceUI.inputEl.value.trim()) {
-            if (typeof form.requestSubmit === 'function') {
-              form.requestSubmit();
-            } else {
-              form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-            }
-          }
-        }, 900);
-      }
+      
+      const transcript = event.results[0][0].transcript;
+      voiceUI.inputEl.value = transcript;
+      
+      setTimeout(() => {
+        const form = document.getElementById('tutor-form');
+        if (form && voiceUI.inputEl.value.trim()) {
+          form.requestSubmit();
+        }
+      }, 500);
     });
-
+    
+    recognition.addEventListener('start', () => {
+      voiceUI.listening = true;
+      if (voiceUI.micBtn) voiceUI.micBtn.classList.add('text-red-300');
+      if (voiceUI.listeningBadge) voiceUI.listeningBadge.classList.remove('hidden');
+    });
+    
+    recognition.addEventListener('end', () => {
+      voiceUI.listening = false;
+      if (voiceUI.micBtn) voiceUI.micBtn.classList.remove('text-red-300');
+      if (voiceUI.listeningBadge) voiceUI.listeningBadge.classList.add('hidden');
+    });
+    
     voiceUI.recognition = recognition;
-
+    
     if (voiceUI.micBtn) {
       voiceUI.micBtn.addEventListener('click', () => {
-        if (!voiceUI.recognition) return;
-
         if (voiceUI.listening) {
-          voiceUI.recognition.stop();
-          return;
-        }
-
-        try {
-          voiceUI.recognition.start();
-        } catch (_) {
-          voiceUI.recognition.stop();
+          recognition.stop();
+        } else {
+          recognition.start();
         }
       });
     }
-
   }
 
   function createTutorBubble(text, role) {
@@ -403,9 +619,9 @@
       messages.appendChild(createTutorBubble(question, 'user'));
       input.value = '';
 
-      const pending = createTutorBubble('Thinking...', 'ai');
-      messages.appendChild(pending);
+      const pending = createTutorBubble('Thinking... 🤔', 'ai');
       pending.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      messages.appendChild(pending);
 
       try {
         const response = await fetch(`/course/${COURSE_ID}/tutor`, {
@@ -413,8 +629,8 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             question,
-            lessonTopic: tutorState.lessonTopic,
-            lessonText: tutorState.lessonText
+            lessonTopic: currentLesson ? currentLesson.title : '',
+            lessonText: currentLesson ? document.getElementById('card-content').innerText : ''
           })
         });
 
@@ -422,68 +638,14 @@
         if (!response.ok) throw new Error(data?.error || 'Failed to get tutor response');
 
         pending.replaceWith(createTutorBubble(data.answer || '', 'ai'));
-
-        const temp = document.createElement('div');
-        temp.innerHTML = marked.parse(data.answer || '');
-        speakText(temp.innerText);
       } catch (err) {
-        pending.replaceWith(createTutorBubble('Sorry — I could not answer that. Please try again.', 'ai'));
+        pending.replaceWith(createTutorBubble('Sorry — I could not answer that. Please try again. 😔', 'ai'));
         console.error(err);
       }
     });
   }
 
-  async function loadLesson(courseId, moduleIdx, topicIdx) {
-    const emptyState = document.getElementById('empty-state');
-    const loadingState = document.getElementById('loading-state');
-    const contentDisplay = document.getElementById('content-display');
-    const titleEl = document.getElementById('lesson-title');
-    const bodyEl = document.getElementById('lesson-body');
-    const messages = document.getElementById('tutor-messages');
-
-    stopSpeaking();
-
-    emptyState.classList.add('hidden');
-    contentDisplay.classList.add('hidden');
-    loadingState.classList.remove('hidden');
-
-    document.querySelectorAll('button[id^="btn-"]').forEach(btn => {
-      btn.classList.remove('bg-zinc-800', 'text-zinc-100', 'font-medium');
-      btn.classList.add('text-zinc-400');
-    });
-
-    const activeBtn = document.getElementById(`btn-${moduleIdx}-${topicIdx}`);
-    if (activeBtn) {
-      activeBtn.classList.add('bg-zinc-800', 'text-zinc-100', 'font-medium');
-      activeBtn.classList.remove('text-zinc-400');
-    }
-
-    try {
-      const response = await fetch(`/course/${courseId}/lesson/${moduleIdx}/${topicIdx}`);
-      if (!response.ok) throw new Error('Failed to load lesson');
-
-      const data = await response.json();
-
-      titleEl.textContent = data.topic;
-      bodyEl.innerHTML = marked.parse(data.content);
-
-      tutorState.lessonTopic = data.topic || '';
-      tutorState.lessonText = bodyEl.innerText || '';
-      if (messages) messages.innerHTML = '';
-
-      loadingState.classList.add('hidden');
-      contentDisplay.classList.remove('hidden');
-
-      speakText(`${data.topic}. ${tutorState.lessonText}`);
-    } catch (err) {
-      console.error(err);
-      loadingState.classList.add('hidden');
-      emptyState.classList.remove('hidden');
-      emptyState.querySelector('h2').textContent = 'Error loading lesson';
-      emptyState.querySelector('p').textContent = 'Please try again.';
-    }
-  }
-
+  // Initialize
   setupVoiceInteraction();
   setupTutorChat();
 </script>

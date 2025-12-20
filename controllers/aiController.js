@@ -193,14 +193,96 @@ async function evaluateAndCreateSyllabus(subject, userAnswers, quizQuestions) {
   };
 }
 
+function validateLessonCards(cards) {
+  if (!Array.isArray(cards) || cards.length === 0) {
+    throw new Error('AI lesson must have at least one card');
+  }
+
+  cards.forEach((card, idx) => {
+    if (!card || typeof card !== 'object') {
+      throw new Error(`Invalid card at index ${idx}`);
+    }
+    
+    if (!['text', 'quiz', 'challenge'].includes(card.type)) {
+      throw new Error(`Card ${idx} must have type 'text', 'quiz', or 'challenge'`);
+    }
+    
+    if (card.type === 'text') {
+      if (typeof card.content !== 'string' || !card.content.trim()) {
+        throw new Error(`Text card ${idx} must have content`);
+      }
+      if (card.image != null && typeof card.image !== 'string') {
+        throw new Error(`Text card ${idx} image must be a string`);
+      }
+    }
+    
+    if (card.type === 'quiz') {
+      if (typeof card.question !== 'string' || !card.question.trim()) {
+        throw new Error(`Quiz card ${idx} must have a question`);
+      }
+      if (!Array.isArray(card.options) || card.options.length < 2) {
+        throw new Error(`Quiz card ${idx} must have at least 2 options`);
+      }
+      card.options.forEach((opt, optIdx) => {
+        if (typeof opt !== 'string') {
+          throw new Error(`Quiz card ${idx} option ${optIdx} must be a string`);
+        }
+      });
+      if (typeof card.answer !== 'string' || !card.answer.trim()) {
+        throw new Error(`Quiz card ${idx} must have an answer`);
+      }
+      if (!card.options.includes(card.answer)) {
+        throw new Error(`Quiz card ${idx} answer must be one of the options`);
+      }
+      if (typeof card.explanation !== 'string' || !card.explanation.trim()) {
+        throw new Error(`Quiz card ${idx} must have an explanation`);
+      }
+    }
+    
+    if (card.type === 'challenge') {
+      if (typeof card.prompt !== 'string' || !card.prompt.trim()) {
+        throw new Error(`Challenge card ${idx} must have a prompt`);
+      }
+      if (typeof card.hint !== 'string' || !card.hint.trim()) {
+        throw new Error(`Challenge card ${idx} must have a hint`);
+      }
+    }
+  });
+
+  return cards;
+}
+
 async function generateLesson(topic, userLevel) {
   const model = getModel();
 
   const prompt = [
-    `Write a comprehensive tutorial for "${topic}" suitable for a ${userLevel} student.`,
-    'Use Markdown formatting.',
-    'Include clear explanations, code examples (if technical), and practical applications.',
-    'Do not wrap in JSON. Return raw Markdown text.',
+    `You are a world-class tutor who explains "${topic}" to a ${userLevel} student.`,
+    'Use the "Feynman Technique" (simple language, analogies).',
+    'Use emojis and humor to make learning fun and engaging.',
+    'Break the topic into bite-sized interactive learning moments.',
+    'Output STRICT JSON with this structure:',
+    '{',
+    '  "title": "The basics of...",',
+    '  "cards": [',
+    '    {',
+    '      "type": "text",',
+    '      "content": "Imagine atoms are like LEGO bricks... 🏗️",',
+    '      "image": "optional-image-url"',
+    '    },',
+    '    {',
+    '      "type": "quiz",',
+    '      "question": "So, are atoms visible?",',
+    '      "options": ["Yes", "No", "Sometimes", "Only with microscope"],',
+    '      "answer": "No",',
+    '      "explanation": "Exactly! Atoms are too small to see with the naked eye! 👀"',
+    '    },',
+    '    {',
+    '      "type": "challenge",',
+    '      "prompt": "Explain atomic structure to a 5-year-old using an analogy",',
+    '      "hint": "Think about building blocks or LEGO! 🧱"',
+    '    }',
+    '  ]',
+    '}'
   ].join('\n');
 
   const result = await model.generateContent(prompt);
@@ -208,20 +290,22 @@ async function generateLesson(topic, userLevel) {
   
   if (!text) throw new Error('AI failed to generate lesson content');
   
-  // Strip markdown code fences if the model wrapped the whole response in one (e.g. ```markdown ... ```)
-  // But be careful not to strip internal code blocks.
-  // Generally the model returns raw text if asked, but sometimes wraps it.
-  // Let's just return the text, but maybe clean up leading/trailing ``` if it's wrapping the whole thing.
+  const parsed = extractJsonFromText(text);
   
-  let cleanText = text.trim();
-  if (cleanText.startsWith('```markdown')) {
-      cleanText = cleanText.replace(/^```markdown\s*/i, '').replace(/\s*```$/i, '');
-  } else if (cleanText.startsWith('```') && !cleanText.includes('\n```', 4)) {
-      // If it starts with ``` and ends with ``` and looks like a single block wrapper
-       cleanText = cleanText.replace(/^```\s*/i, '').replace(/\s*```$/i, '');
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('AI lesson response was not an object');
+  }
+  if (typeof parsed.title !== 'string' || !parsed.title.trim()) {
+    throw new Error('AI lesson response missing title');
+  }
+  if (!parsed.cards || !Array.isArray(parsed.cards)) {
+    throw new Error('AI lesson response missing cards array');
   }
 
-  return cleanText;
+  return {
+    title: parsed.title,
+    cards: validateLessonCards(parsed.cards)
+  };
 }
 
 async function generateTutorResponse({ question, courseTopic, userLevel, lessonTopic, lessonText }) {
