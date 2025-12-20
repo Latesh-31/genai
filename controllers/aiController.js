@@ -102,6 +102,7 @@ async function gradeQuiz(topic, quiz, userAnswers) {
     'You are grading a quiz submission.',
     'Use the provided quiz (including correctIndex) and the provided userAnswers to compute the score.',
     'Identify weak topics based on missed questions (use weak_topic from the question when available; otherwise infer).',
+    'For each question, provide detailed analysis including correct answer, explanation, and specific feedback.',
     '',
     'Return JSON with this shape:',
     '{',
@@ -109,7 +110,7 @@ async function gradeQuiz(topic, quiz, userAnswers) {
     '  "weak_topics": ["..."],',
     '  "feedback_text": "Short, actionable feedback.",',
     '  "per_question": [',
-    '    { "index": 0, "correct": true, "weak_topic": "...", "note": "..." }',
+    '    { "index": 0, "correct": true, "weak_topic": "...", "note": "...", "correct_answer": "...", "explanation": "..." }',
     '  ]',
     '}',
     '',
@@ -191,6 +192,55 @@ async function evaluateAndCreateSyllabus(subject, userAnswers, quizQuestions) {
     level,
     grading: gradingResult
   };
+}
+
+async function generateModuleExitQuiz(moduleTitle, moduleTopics, userLevel) {
+  const model = getModel();
+
+  const prompt = [
+    'Return ONLY valid JSON. No markdown. No code fences.',
+    'Generate a 3-question exit quiz for a module.',
+    'The quiz should test comprehension of the module content.',
+    'Each question must have exactly 4 options and include the correct answer index (0-3).',
+    '',
+    'JSON shape:',
+    '[',
+    '  {',
+    '    "question": "...",',
+    '    "options": ["...", "...", "...", "..."],',
+    '    "correctIndex": 0',
+    '  }',
+    ']',
+    '',
+    `Module Title: ${moduleTitle}`,
+    `Module Topics: ${moduleTopics.join(', ')}`,
+    `User Level: ${userLevel}`
+  ].join('\n');
+
+  const result = await model.generateContent(prompt);
+  const text = result?.response?.text?.() || '';
+  const parsed = extractJsonFromText(text);
+
+  if (!Array.isArray(parsed) || parsed.length !== 3) {
+    throw new Error('AI module exit quiz must be an array of exactly 3 questions');
+  }
+
+  parsed.forEach((q, idx) => {
+    if (!q || typeof q !== 'object') {
+      throw new Error(`Invalid quiz question at index ${idx}`);
+    }
+    if (typeof q.question !== 'string' || !q.question.trim()) {
+      throw new Error(`Quiz question text missing at index ${idx}`);
+    }
+    if (!Array.isArray(q.options) || q.options.length !== 4 || q.options.some((o) => typeof o !== 'string')) {
+      throw new Error(`Quiz options must be an array of 4 strings at index ${idx}`);
+    }
+    if (!Number.isInteger(q.correctIndex) || q.correctIndex < 0 || q.correctIndex > 3) {
+      throw new Error(`Quiz correctIndex must be 0..3 at index ${idx}`);
+    }
+  });
+
+  return parsed;
 }
 
 function validateLessonCards(cards) {
@@ -347,5 +397,6 @@ module.exports = {
   gradeQuiz,
   evaluateAndCreateSyllabus,
   generateLesson,
-  generateTutorResponse
+  generateTutorResponse,
+  generateModuleExitQuiz
 };

@@ -51,14 +51,51 @@
     </div>
   </section>
 
+  <!-- Resume Learning Section -->
+  <% if (courses && courses.length > 0) { %>
+    <section class="mb-12">
+      <div class="mb-6 flex items-center justify-between">
+        <h2 class="text-2xl font-bold tracking-tight text-zinc-100">Resume Learning</h2>
+        <span class="text-sm text-zinc-500"><%= courses.length %> in progress</span>
+      </div>
+      
+      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <% courses.forEach(course => { %>
+          <a href="/course/<%= course.id %>" class="group block rounded-lg border border-zinc-800 bg-zinc-900/30 p-5 transition-all hover:border-zinc-700 hover:bg-zinc-900/50 hover:shadow-indigo-500/10 hover:shadow-lg">
+            <div class="mb-2 flex items-start justify-between">
+              <h3 class="font-semibold text-zinc-100"><%= course.topic %></h3>
+              <span class="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-400">
+                <%= course.level || 'Beginner' %>
+              </span>
+            </div>
+            <div class="mt-4 flex items-center justify-between text-sm text-zinc-500">
+              <span>Progress: <%= course.progress || 0 %>%</span>
+              <span class="flex items-center gap-1">
+                <span class="h-2 w-2 animate-pulse rounded-full bg-green-400"></span>
+                In Progress
+              </span>
+            </div>
+          </a>
+        <% }) %>
+      </div>
+    </section>
+  <% } %>
+
+  <!-- Explore New Topics Section -->
   <section class="mb-16">
     <h1 class="mb-6 text-3xl font-bold tracking-tight text-zinc-100">What do you want to learn today?</h1>
     <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
       <% subjects.forEach(subject => { %>
-        <a href="/quiz/<%= encodeURIComponent(subject.name) %>" class="group relative flex flex-col items-center justify-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 text-center transition-all hover:border-zinc-700 hover:bg-zinc-900">
-          <span class="text-3xl"><%= subject.icon %></span>
-          <span class="font-medium text-zinc-200"><%= subject.name %></span>
-        </a>
+        <% 
+          // Check if user is already learning this subject
+          const isLearning = courses.some(course => course.topic === subject.name);
+          if (!isLearning) {
+        %>
+          <a href="/quiz/<%= encodeURIComponent(subject.name) %>" class="group relative flex flex-col items-center justify-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 text-center transition-all hover:border-zinc-700 hover:bg-zinc-900 hover:shadow-indigo-500/10 hover:shadow-lg hover:transform hover:-translate-y-1">
+            <span class="text-3xl"><%= subject.icon %></span>
+            <span class="font-medium text-zinc-200"><%= subject.name %></span>
+          </a>
+        <% } %>
       <% }) %>
     </div>
   </section>
