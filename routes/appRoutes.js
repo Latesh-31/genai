@@ -155,4 +155,34 @@ router.get('/course/:id/lesson/:moduleIndex/:topicIndex', requireAuth, asyncHand
   });
 }));
 
+// POST /course/:id/tutor
+router.post('/course/:id/tutor', requireAuth, asyncHandler(async (req, res) => {
+  const courseId = parseInt(req.params.id, 10);
+  const rows = await query('SELECT * FROM courses WHERE id = ? AND user_id = ?', [courseId, req.session.user.id]);
+
+  if (!rows.length) {
+    return res.status(404).json({ error: 'Course not found' });
+  }
+
+  const question = (req.body.question || '').trim();
+  if (!question) {
+    return res.status(400).json({ error: 'Question is required' });
+  }
+
+  const lessonTopic = typeof req.body.lessonTopic === 'string' ? req.body.lessonTopic.trim() : '';
+  const lessonText = typeof req.body.lessonText === 'string' ? req.body.lessonText : '';
+
+  const course = rows[0];
+
+  const answer = await aiController.generateTutorResponse({
+    question,
+    courseTopic: course.topic,
+    userLevel: course.level,
+    lessonTopic,
+    lessonText
+  });
+
+  res.json({ answer });
+}));
+
 module.exports = router;
