@@ -24,6 +24,117 @@
         .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; color: #d4d4d8; }
         .prose code { background: #27272a; padding: 0.2rem 0.4rem; border-radius: 4px; color: #a5b4fc; font-family: monospace; }
         .prose pre { background: #18181b; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin-bottom: 1rem; }
+        
+        /* CHATBOT STYLES */
+        .chat-widget {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 9999;
+        }
+        
+        .chat-window {
+            position: absolute;
+            bottom: 5rem;
+            right: 0;
+            width: 24rem;
+            height: 32rem;
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 0.75rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .chat-window.open {
+            display: flex;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .chat-input-area {
+            border-top: 1px solid #27272a;
+            padding: 1rem;
+        }
+        
+        .message {
+            max-width: 80%;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        
+        .message.user {
+            background: #6366f1;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 0.125rem;
+        }
+        
+        .message.assistant {
+            background: #27272a;
+            color: #d4d4d8;
+            align-self: flex-start;
+            border-bottom-left-radius: 0.125rem;
+        }
+        
+        .typing-indicator {
+            display: flex;
+            gap: 0.25rem;
+            padding: 0.5rem 0.75rem;
+            background: #27272a;
+            border-radius: 0.5rem;
+            border-bottom-left-radius: 0.125rem;
+            align-self: flex-start;
+            max-width: 80%;
+        }
+        
+        .typing-dot {
+            width: 0.5rem;
+            height: 0.5rem;
+            background: #6b7280;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+        
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        
+        @keyframes typing {
+            0%, 60%, 100% { opacity: 0.3; }
+            30% { opacity: 1; }
+        }
+        
+        .voice-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            background: #ef4444;
+            color: white;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .voice-indicator.listening {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
     </style>
 </head>
 
@@ -115,6 +226,69 @@
 
     </main>
 
+    <!-- AI Chatbot Widget -->
+    <div class="chat-widget">
+        <div id="chat-window" class="chat-window">
+            <div class="bg-zinc-800 p-4 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="lucide-bot text-indigo-400 w-5 h-5"></i>
+                    <span class="text-white font-medium">AI Tutor</span>
+                </div>
+                <button id="close-chat" class="text-zinc-400 hover:text-white transition">
+                    <i class="lucide-x w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div id="chat-messages" class="chat-messages custom-scrollbar">
+                <div class="message assistant">
+                    👋 Hi! I'm your AI tutor. Ask me anything about the lesson you're studying!
+                </div>
+            </div>
+            
+            <div class="chat-input-area">
+                <div id="voice-status" class="voice-indicator hidden">
+                    <i class="lucide-mic w-3 h-3"></i>
+                    <span>Listening...</span>
+                </div>
+                <div class="flex gap-2">
+                    <input 
+                        type="text" 
+                        id="chat-input" 
+                        placeholder="Ask a question..."
+                        class="flex-1 bg-zinc-800 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <button 
+                        id="voice-btn"
+                        class="bg-zinc-800 text-zinc-400 hover:text-white px-3 py-2 rounded-lg transition flex items-center"
+                        title="Voice input"
+                    >
+                        <i class="lucide-mic w-4 h-4"></i>
+                    </button>
+                    <button 
+                        id="speak-btn"
+                        class="bg-zinc-800 text-zinc-400 hover:text-white px-3 py-2 rounded-lg transition flex items-center"
+                        title="Speak response"
+                    >
+                        <i class="lucide-volume-2 w-4 h-4"></i>
+                    </button>
+                    <button 
+                        id="send-btn"
+                        class="bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-500 transition flex items-center"
+                    >
+                        <i class="lucide-send w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <button 
+            id="chat-toggle"
+            class="w-14 h-14 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg shadow-indigo-500/20 transition-all hover:scale-110 flex items-center justify-center"
+        >
+            <i class="lucide-message-circle w-6 h-6"></i>
+        </button>
+    </div>
+
     <script>
         // Setup
         mermaid.initialize({ startOnLoad: false, theme: 'dark' });
@@ -123,6 +297,200 @@
         const courseData = JSON.parse(document.getElementById('course-data').textContent);
         let currentLesson = null;
         let cardIndex = 0;
+
+        // Chatbot functionality
+        let recognition = null;
+        let isListening = false;
+
+        // Initialize speech recognition
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('chat-input').value = transcript;
+                stopListening();
+                sendMessage();
+            };
+
+            recognition.onerror = function(event) {
+                console.error('Speech recognition error:', event.error);
+                stopListening();
+                showError('Voice recognition failed. Please try again.');
+            };
+
+            recognition.onend = function() {
+                stopListening();
+            };
+        }
+
+        function startListening() {
+            if (!recognition) {
+                showError('Voice recognition is not supported in your browser.');
+                return;
+            }
+
+            isListening = true;
+            const voiceStatus = document.getElementById('voice-status');
+            const voiceBtn = document.getElementById('voice-btn');
+            
+            voiceStatus.classList.remove('hidden', 'listening');
+            setTimeout(() => voiceStatus.classList.add('listening'), 10);
+            voiceBtn.classList.add('text-red-400');
+            
+            recognition.start();
+        }
+
+        function stopListening() {
+            isListening = false;
+            const voiceStatus = document.getElementById('voice-status');
+            const voiceBtn = document.getElementById('voice-btn');
+            
+            voiceStatus.classList.add('hidden');
+            voiceBtn.classList.remove('text-red-400');
+            
+            if (recognition) {
+                recognition.stop();
+            }
+        }
+
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 0.9;
+                utterance.pitch = 1;
+                speechSynthesis.speak(utterance);
+            } else {
+                showError('Text-to-speech is not supported in your browser.');
+            }
+        }
+
+        function getLessonContext() {
+            if (!currentLesson || !currentLesson.cards) return '';
+            
+            const context = [];
+            context.push(`Lesson: ${currentLesson.title}`);
+            
+            currentLesson.cards.forEach((card, idx) => {
+                if (card.type === 'text') {
+                    context.push(`Card ${idx + 1}: ${card.content.substring(0, 200)}...`);
+                } else if (card.type === 'quiz') {
+                    context.push(`Quiz ${idx + 1}: ${card.question}`);
+                }
+            });
+            
+            return context.join('\n\n');
+        }
+
+        function addMessage(content, isUser = false) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'assistant'}`;
+            messageDiv.textContent = content;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const messagesContainer = document.getElementById('chat-messages');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'typing-indicator';
+            typingDiv.id = 'typing-indicator';
+            typingDiv.innerHTML = '
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            ';
+            messagesContainer.appendChild(typingDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        function showError(message) {
+            addMessage(`⚠️ ${message}`, false);
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message
+            addMessage(message, true);
+            input.value = '';
+            
+            // Show typing indicator
+            showTypingIndicator();
+            
+            try {
+                const response = await fetch(`/course/${courseData.id}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        question: message,
+                        lessonContext: getLessonContext()
+                    })
+                });
+                
+                const data = await response.json();
+                hideTypingIndicator();
+                
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    addMessage(data.answer, false);
+                }
+            } catch (error) {
+                hideTypingIndicator();
+                showError('Failed to get response. Please try again.');
+                console.error('Chat error:', error);
+            }
+        }
+
+        // Chat UI event listeners
+        document.getElementById('chat-toggle').addEventListener('click', () => {
+            const chatWindow = document.getElementById('chat-window');
+            chatWindow.classList.toggle('open');
+        });
+
+        document.getElementById('close-chat').addEventListener('click', () => {
+            document.getElementById('chat-window').classList.remove('open');
+        });
+
+        document.getElementById('send-btn').addEventListener('click', sendMessage);
+        document.getElementById('chat-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        document.getElementById('voice-btn').addEventListener('click', () => {
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        });
+
+        document.getElementById('speak-btn').addEventListener('click', () => {
+            const messages = document.querySelectorAll('.message.assistant');
+            if (messages.length > 0) {
+                const lastMessage = messages[messages.length - 1];
+                speakText(lastMessage.textContent);
+            }
+        });
 
         document.addEventListener('DOMContentLoaded', () => {
             // Sidebar Clicks
