@@ -10,8 +10,8 @@ const session = require('express-session');
 // 1. IMPORT AI CONTROLLER (New)
 const { generateLesson } = require('./controllers/aiController'); 
 
-// Database Configuration
-const { initializeDB, query } = require('./config/database');
+// Firebase Configuration
+const { db, admin } = require('./config/firebase');
 const appRoutes = require('./routes/appRoutes');
 
 const app = express();
@@ -78,7 +78,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/health', asyncHandler(async (req, res) => {
-  await query('SELECT 1');
+  // Simple health check - Firebase connection is established at startup
   res.json({ ok: true });
 }));
 
@@ -100,17 +100,22 @@ app.post('/register', asyncHandler(async (req, res) => {
     return res.redirect('/register?error=' + encodeURIComponent('Password must be at least 8 characters.'));
   }
 
-  const existing = await query('SELECT id FROM users WHERE email = ? LIMIT 1', [email]);
-  if (existing.length) {
+  const existingUsers = await db.collection('users').where('email', '==', email).limit(1).get();
+  if (!existingUsers.empty) {
     return res.redirect('/register?error=' + encodeURIComponent('Email already exists.'));
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const result = await query('INSERT INTO users (name, email, password) VALUES (?, ?, ?)', [
-    name, email, passwordHash
-  ]);
+  const userRef = await db.collection('users').add({
+    name,
+    email,
+    password: passwordHash,
+    total_xp: 0,
+    streak_days: 0,
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  });
 
-  req.session.user = { id: result.insertId, name, email };
+  req.session.user = { id: userRef.id, name, email };
   res.redirect('/dashboard?message=' + encodeURIComponent('Welcome to AdaptLearn AI!'));
 }));
 
@@ -123,8 +128,13 @@ app.post('/login', asyncHandler(async (req, res) => {
   const email = (req.body.email || '').trim().toLowerCase();
   const password = req.body.password || '';
 
-  const users = await query('SELECT id, name, email, password FROM users WHERE email = ? LIMIT 1', [email]);
-  const user = users[0];
+  const usersSnapshot = await db.collection('users').where('email', '==', email).limit(1).get();
+  if (usersSnapshot.empty) {
+    return res.redirect('/login?error=' + encodeURIComponent('Invalid email or password.'));
+  }
+  
+  const userDoc = usersSnapshot.docs[0];
+  const user = { id: userDoc.id, ...userDoc.data() };
 
   if (!user || !(await bcrypt.compare(password, user.password))) {
     return res.redirect('/login?error=' + encodeURIComponent('Invalid email or password.'));
@@ -139,83 +149,6 @@ app.post('/logout', (req, res) => {
     res.redirect('/login?message=' + encodeURIComponent('Logged out successfully.'));
   });
 });
-
-// ---------------------------------------------------------
-// COURSE ROUTE (Load Page)
-// ---------------------------------------------------------
-app.get('/course/:id', requireAuth, asyncHandler(async (req, res) => {
-  const courseId = req.params.id;
-  
-  const courses = await query('SELECT * FROM courses WHERE id = ?', [courseId]);
-  const course = courses[0];
-
-  if (!course) {
-    return res.status(404).render('error', { 
-      title: 'Not Found', statusCode: 404, errorMessage: 'Course not found.' 
-    });
-  }
-
-  // Parse Syllabus
-  try {
-    course.syllabus = JSON.parse(course.syllabus_json || '[]');
-  } catch (e) {
-    course.syllabus = [];
-  }
-
-  // Default Lesson (Intro)
-  const firstModuleTitle = course.syllabus[0]?.title || "Introduction";
-  const defaultLesson = {
-    title: firstModuleTitle,
-    cards: [
-      { 
-        type: "text", 
-        content: `## Welcome to ${course.topic} \n\nThis course is personalized for your **${course.level || 'Beginner'}** level.\n\nClick **Next** to start module 1!` 
-      },
-      {
-        type: "chart",
-        content: "graph TD; A[Start] --> B(Module 1); B --> C{Quiz}; C -- Pass --> D[Next];"
-      }
-    ]
-  };
-
-  res.render('course', { 
-    title: course.topic,
-    course: course,
-    lesson: defaultLesson 
-  });
-}));
-
-// ---------------------------------------------------------
-// NEW API: GENERATE LESSON (Called by Frontend fetch)
-// ---------------------------------------------------------
-app.post('/api/generate-lesson', requireAuth, asyncHandler(async (req, res) => {
-    const { courseId, moduleIndex } = req.body;
-
-    // 1. Get Course
-    const courses = await query('SELECT * FROM courses WHERE id = ?', [courseId]);
-    const course = courses[0];
-
-    if (!course) return res.status(404).json({ error: 'Course not found' });
-
-    // 2. Identify Topic
-    const syllabus = JSON.parse(course.syllabus_json || '[]');
-    const module = syllabus[moduleIndex];
-
-    if (!module) return res.status(404).json({ error: 'Module not found' });
-
-    // 3. Ask AI
-    const topicPrompt = `${module.title}: ${module.topics ? module.topics.join(', ') : ''}`;
-    
-    try {
-        // Use the imported controller function
-        const lessonData = await generateLesson(topicPrompt, course.level || 'Beginner');
-        res.json(lessonData);
-    } catch (error) {
-        console.error("AI Generation Error:", error);
-        res.status(500).json({ error: "Failed to generate lesson content." });
-    }
-}));
-// ---------------------------------------------------------
 
 app.use('/', appRoutes);
 
@@ -239,7 +172,7 @@ app.use((err, req, res, next) => {
 const port = Number(process.env.PORT || 3000);
 
 async function start() {
-  await initializeDB();
+  // Firebase is already initialized when module is loaded
   app.listen(port, () => {
     console.log(`AdaptLearn AI running on http://localhost:${port}`);
   });

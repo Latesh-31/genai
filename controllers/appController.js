@@ -1,233 +1,245 @@
+const { db } = require('../config/firebase');
 const aiController = require('./aiController');
-const { query } = require('../config/database');
 
-const DEFAULT_SUBJECTS = [
-  { name: 'Python', icon: '🐍' },
-  { name: 'React', icon: '⚛️' },
-  { name: 'History', icon: '📜' },
-  { name: 'Physics', icon: '🔭' },
-  { name: 'JavaScript', icon: '💻' },
-  { name: 'SQL', icon: '🗄️' },
-  { name: 'Machine Learning', icon: '🤖' },
-  { name: 'System Design', icon: '🏗️' }
-];
-
-function parseJsonSafe(value, fallback) {
-  if (!value || typeof value !== 'string') return fallback;
-  try {
-    return JSON.parse(value);
-  } catch (_) {
-    return fallback;
-  }
+function asyncHandler(fn) {
+  return function wrapped(req, res, next) {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
 }
 
-function getModulesCountFromSyllabusJson(syllabusJson) {
-  const parsed = parseJsonSafe(syllabusJson, null);
-  if (Array.isArray(parsed)) return parsed.length;
-  return 6;
-}
-
+// Dashboard
 async function getDashboard(req, res) {
-  const userId = req.session.user.id;
+  try {
+    const userId = req.session.user.id;
+    
+    // Get user data
+    const userDoc = await db.collection('users').doc(userId).get();
+    const userData = userDoc.exists ? userDoc.data() : {};
+    
+    // Get user's courses
+    const coursesSnapshot = await db.collection('courses')
+      .where('userId', '==', userId)
+      .orderBy('createdAt', 'desc')
+      .get();
+    
+    const courses = [];
+    coursesSnapshot.forEach(doc => {
+      const course = { id: doc.id, ...doc.data() };
+      courses.push(course);
+    });
 
-  const userRows = await query(
-    'SELECT id, name, email, total_xp, streak_days, last_lesson_date FROM users WHERE id = ? LIMIT 1',
-    [userId]
-  );
-  const user = userRows[0] || req.session.user;
+    // Get user's assessments
+    const assessmentsSnapshot = await db.collection('assessments')
+      .where('userId', '==', userId)
+      .orderBy('createdAt', 'desc')
+      .limit(10)
+      .get();
+    
+    const assessments = [];
+    assessmentsSnapshot.forEach(doc => {
+      const assessment = { id: doc.id, ...doc.data() };
+      assessments.push(assessment);
+    });
 
-  const courses = await query(
-    'SELECT id, topic, progress, level, completed_modules, syllabus_json, created_at FROM courses WHERE user_id = ? ORDER BY id DESC',
-    [userId]
-  );
-
-  const activeTopics = new Set(
-    (courses || []).map((c) => (c.topic || '').trim().toLowerCase()).filter(Boolean)
-  );
-
-  const exploreSubjects = DEFAULT_SUBJECTS.filter(
-    (s) => !activeTopics.has(s.name.trim().toLowerCase())
-  );
-
-  const hydratedCourses = (courses || []).map((course) => {
-    const modulesTotal = getModulesCountFromSyllabusJson(course.syllabus_json);
-    const completedModules = Number.isFinite(course.completed_modules) ? course.completed_modules : 0;
-    const completed = completedModules >= modulesTotal || Number(course.progress || 0) >= 100;
-
-    return {
-      ...course,
-      modulesTotal,
-      completedModules,
-      completed
-    };
-  });
-
-  res.render('dashboard', {
-    title: 'Dashboard',
-    user,
-    exploreSubjects,
-    resumeCourses: hydratedCourses.filter((c) => !c.completed),
-    completedCourses: hydratedCourses.filter((c) => c.completed)
-  });
-}
-
-function buildFallbackExitQuiz(module) {
-  const topics = Array.isArray(module?.topics) ? module.topics : [];
-  const seed = topics.slice(0, 3);
-  const promptTopic = seed[0] || module?.title || 'this module';
-
-  return Array.from({ length: 3 }).map((_, idx) => {
-    const focus = seed[idx] || promptTopic;
-
-    return {
-      question: `Quick check: which option best matches the key idea of "${focus}"?`,
-      options: [
-        `The core definition/concept of ${focus}`,
-        `An unrelated idea that sounds similar`,
-        `A common misconception about ${focus}`,
-        `A detail that is true but not the main idea`
-      ],
-      correctIndex: 0,
-      review_topic: focus,
-      explanation: `If you missed this, re-read the section covering ${focus} and try to explain it in your own words.`
-    };
-  });
-}
-
-async function verifyModuleMastery(req, res) {
-  const courseId = Number(req.params.id);
-  const userId = req.session.user.id;
-
-  const moduleIndex = Number(req.body.moduleIndex);
-  if (!Number.isInteger(courseId) || !Number.isInteger(moduleIndex) || moduleIndex < 0) {
-    return res.status(400).json({ error: 'Invalid courseId or moduleIndex' });
-  }
-
-  const rows = await query('SELECT * FROM courses WHERE id = ? AND user_id = ? LIMIT 1', [courseId, userId]);
-  if (!rows.length) {
-    return res.status(404).json({ error: 'Course not found' });
-  }
-
-  const course = rows[0];
-  const syllabus = parseJsonSafe(course.syllabus_json, []);
-
-  if (!Array.isArray(syllabus) || !syllabus[moduleIndex]) {
-    return res.status(404).json({ error: 'Module not found' });
-  }
-
-  const completedModules = Number.isInteger(course.completed_modules) ? course.completed_modules : 0;
-
-  if (moduleIndex < completedModules) {
-    return res.json({
-      passed: true,
-      alreadyUnlocked: true,
-      completed_modules: completedModules,
-      progress: Number(course.progress || 0)
+    res.render('dashboard', {
+      title: 'Dashboard',
+      user: { id: userId, ...userData },
+      courses,
+      assessments
+    });
+  } catch (error) {
+    console.error('Dashboard error:', error);
+    res.render('dashboard', {
+      title: 'Dashboard',
+      user: req.session.user,
+      courses: [],
+      assessments: []
     });
   }
-
-  if (moduleIndex !== completedModules) {
-    return res.status(403).json({ error: 'This module is locked. Complete previous modules first.' });
-  }
-
-  const module = syllabus[moduleIndex];
-  const exitQuiz = Array.isArray(module.exit_quiz) && module.exit_quiz.length
-    ? module.exit_quiz
-    : buildFallbackExitQuiz(module);
-
-  const answers = Array.isArray(req.body.answers)
-    ? req.body.answers.map((n) => Number(n))
-    : [];
-
-  const total = exitQuiz.length;
-  const perQuestion = exitQuiz.map((q, idx) => {
-    const submitted = Number.isInteger(answers[idx]) ? answers[idx] : -1;
-    const correctIndex = Number.isInteger(q.correctIndex) ? q.correctIndex : 0;
-
-    return {
-      idx,
-      submitted,
-      correctIndex,
-      correct: submitted === correctIndex,
-      review_topic: typeof q.review_topic === 'string' && q.review_topic.trim() ? q.review_topic.trim() : null,
-      explanation: typeof q.explanation === 'string' ? q.explanation : ''
-    };
-  });
-
-  const correctCount = perQuestion.filter((p) => p.correct).length;
-  const scorePct = total ? correctCount / total : 0;
-  const passed = scorePct >= 2 / 3;
-
-  if (!passed) {
-    const misses = perQuestion.filter((p) => !p.correct);
-    const reviewTopics = misses
-      .map((m) => m.review_topic)
-      .filter(Boolean)
-      .slice(0, 3);
-
-    const feedbackText = reviewTopics.length
-      ? `Review the section on ${reviewTopics.join(', ')} and retry the lesson.`
-      : 'Review the lesson and try again.';
-
-    return res.json({
-      passed: false,
-      correct: correctCount,
-      total,
-      feedbackText,
-      mistakes: misses.map((m) => ({
-        index: m.idx,
-        review_topic: m.review_topic,
-        explanation: m.explanation
-      }))
-    });
-  }
-
-  const modulesTotal = Array.isArray(syllabus) ? syllabus.length : 6;
-  const nextCompleted = Math.min(modulesTotal, completedModules + 1);
-  const nextProgress = Math.round((nextCompleted / modulesTotal) * 100);
-
-  await query('UPDATE courses SET completed_modules = ?, progress = ? WHERE id = ? AND user_id = ?', [
-    nextCompleted,
-    nextProgress,
-    courseId,
-    userId
-  ]);
-
-  return res.json({
-    passed: true,
-    correct: correctCount,
-    total,
-    completed_modules: nextCompleted,
-    progress: nextProgress
-  });
 }
 
+// Generate map from assessment
 async function generateMapFromAssessment(req, res) {
-  const assessmentId = Number(req.params.id);
-  if (!Number.isInteger(assessmentId)) {
-    return res.redirect('/dashboard?error=' + encodeURIComponent('Invalid assessment.'));
+  try {
+    const assessmentId = req.params.id;
+    const userId = req.session.user.id;
+    
+    const assessmentDoc = await db.collection('assessments')
+      .where('userId', '==', userId)
+      .where(admin.firestore.FieldPath.documentId(), '==', assessmentId)
+      .get();
+    
+    if (assessmentDoc.empty) {
+      return res.redirect('/dashboard?error=' + encodeURIComponent('Assessment not found.'));
+    }
+
+    const assessment = { id: assessmentDoc.docs[0].id, ...assessmentDoc.docs[0].data() };
+    const { syllabus, level } = await aiController.evaluateAndCreateSyllabus(
+      assessment.topic,
+      assessment.userAnswers || [],
+      assessment.quizQuestions || []
+    );
+
+    // Create course
+    const courseRef = await db.collection('courses').add({
+      userId,
+      topic: assessment.topic,
+      level,
+      syllabus,
+      progress: 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    res.redirect(`/course/${courseRef.id}`);
+  } catch (error) {
+    console.error('Generate map error:', error);
+    res.redirect('/dashboard?error=' + encodeURIComponent('Failed to generate learning map.'));
   }
+}
 
-  const current = req.session.currentAssessment;
-  if (!current || !current.quiz || !current.subject || !Array.isArray(current.userAnswers)) {
-    return res.redirect('/dashboard?error=' + encodeURIComponent('No active assessment found.'));
+// Verify module mastery
+async function verifyModuleMastery(req, res) {
+  try {
+    const courseId = req.params.id;
+    const userId = req.session.user.id;
+    const { moduleIndex, userAnswers } = req.body;
+
+    const courseDoc = await db.collection('courses').doc(courseId).get();
+    if (!courseDoc.exists || courseDoc.data().userId !== userId) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    const course = { id: courseId, ...courseDoc.data() };
+    const module = course.syllabus[moduleIndex];
+
+    if (!module || !module.exit_quiz) {
+      return res.status(400).json({ error: 'Module quiz not found' });
+    }
+
+    // Grade the exit quiz
+    const score = userAnswers.reduce((acc, answer, idx) => {
+      return acc + (answer === module.exit_quiz[idx].correctIndex ? 1 : 0);
+    }, 0);
+
+    const passed = score >= 2; // Need at least 2/3 correct
+
+    if (passed) {
+      // Update completed modules
+      const newCompletedModules = Math.max(course.completed_modules || 0, parseInt(moduleIndex) + 1);
+      await db.collection('courses').doc(courseId).update({
+        completed_modules: newCompletedModules
+      });
+    }
+
+    res.json({ 
+      passed, 
+      score, 
+      total: module.exit_quiz.length,
+      feedback: passed ? 'Module completed! 🎉' : 'Keep studying and try again! 💪'
+    });
+  } catch (error) {
+    console.error('Verify module error:', error);
+    res.status(500).json({ error: 'Failed to verify module mastery.' });
   }
+}
 
-  const { subject, quiz, userAnswers } = current;
+// Get lesson with caching
+async function getLessonForTopic(courseId, moduleIndex, topicIndex, topicName, userLevel) {
+  try {
+    // Construct the document ID
+    const docId = `${courseId}_${moduleIndex}_${topicIndex}`;
+    const lessonDoc = await db.collection('lessons').doc(docId).get();
 
-  const { syllabus, level } = await aiController.evaluateAndCreateSyllabus(subject, userAnswers, quiz);
+    // If exists, return cached content
+    if (lessonDoc.exists) {
+      return lessonDoc.data().content_json;
+    }
 
-  const courseResult = await query(
-    'INSERT INTO courses (user_id, topic, level, syllabus_json, progress, completed_modules) VALUES (?, ?, ?, ?, ?, ?)',
-    [req.session.user.id, subject, level, JSON.stringify(syllabus), 0, 0]
-  );
+    // Generate new lesson
+    const lessonContent = await aiController.generateLesson(topicName, userLevel);
 
-  delete req.session.currentAssessment;
-  res.redirect(`/course/${courseResult.insertId}`);
+    // Cache the lesson
+    await db.collection('lessons').doc(docId).set({
+      title: lessonContent.title,
+      content_json: lessonContent,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return lessonContent;
+  } catch (error) {
+    console.error('Get lesson error:', error);
+    throw error;
+  }
+}
+
+// Handle lesson completion
+async function completeLesson(req, res) {
+  try {
+    const courseId = req.params.id;
+    const userId = req.session.user.id;
+    const { moduleIndex, topicIndex, xpEarned = 100 } = req.body;
+
+    const courseDoc = await db.collection('courses').doc(courseId).get();
+    if (!courseDoc.exists || courseDoc.data().userId !== userId) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    const course = { id: courseId, ...courseDoc.data() };
+
+    // Check if lesson was already completed
+    const completionDocId = `${userId}_${courseId}_${moduleIndex}_${topicIndex}`;
+    const completionDoc = await db.collection('lesson_completions').doc(completionDocId).get();
+
+    if (!completionDoc.exists) {
+      // Create lesson completion record
+      await db.collection('lesson_completions').doc(completionDocId).set({
+        userId,
+        courseId,
+        moduleIndex,
+        topicIndex,
+        xpEarned,
+        completedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Update user's total XP + streak
+      const userDoc = await db.collection('users').doc(userId).get();
+      const userData = userDoc.exists ? userDoc.data() : {};
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+      const lastLessonDate = userData.last_lesson_date || null;
+      const currentStreak = Number(userData.streak_days || 0);
+
+      let nextStreak = currentStreak;
+      if (lastLessonDate === todayStr) {
+        nextStreak = currentStreak;
+      } else if (lastLessonDate === yesterdayStr) {
+        nextStreak = currentStreak + 1;
+      } else {
+        nextStreak = 1;
+      }
+
+      await db.collection('users').doc(userId).update({
+        total_xp: admin.firestore.FieldValue.increment(xpEarned),
+        last_lesson_date: todayStr,
+        streak_days: nextStreak
+      });
+    }
+
+    res.json({ success: true, xpEarned });
+  } catch (error) {
+    console.error('Complete lesson error:', error);
+    res.status(500).json({ error: 'Failed to complete lesson.' });
+  }
 }
 
 module.exports = {
   getDashboard,
+  generateMapFromAssessment,
   verifyModuleMastery,
-  generateMapFromAssessment
+  getLessonForTopic,
+  completeLesson
 };

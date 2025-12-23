@@ -451,10 +451,43 @@ async function generateTutorResponse({ question, courseTopic, userLevel, lessonT
   return cleanText;
 }
 
+async function getChatResponse(userQuestion, lessonContext) {
+  const model = getModel();
+
+  const context = typeof lessonContext === 'string' ? lessonContext.slice(0, 8000) : '';
+
+  const prompt = [
+    'You are AdaptLearn AI Tutor, a helpful and friendly learning assistant.',
+    'Answer the user question clearly and concisely based on the provided lesson context.',
+    'Keep answers short and focused on helping the user understand the concept.',
+    'Use simple language and be encouraging.',
+    'If the question isn\'t covered in the lesson context, provide a helpful general answer but note that it\'s outside the current lesson scope.',
+    context ? `Lesson context:\n${context}` : '',
+    `User question: ${userQuestion}`
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
+  const result = await model.generateContent(prompt);
+  const text = result?.response?.text?.() || '';
+
+  if (!text) throw new Error('AI failed to generate chat response');
+
+  let cleanText = text.trim();
+  if (cleanText.startsWith('```markdown')) {
+    cleanText = cleanText.replace(/^```markdown\s*/i, '').replace(/\s*```$/i, '');
+  } else if (cleanText.startsWith('```') && !cleanText.includes('\n```', 4)) {
+    cleanText = cleanText.replace(/^```\s*/i, '').replace(/\s*```$/i, '');
+  }
+
+  return cleanText;
+}
+
 module.exports = {
   generateQuiz,
   gradeQuiz,
   evaluateAndCreateSyllabus,
   generateLesson,
-  generateTutorResponse
+  generateTutorResponse,
+  getChatResponse
 };
