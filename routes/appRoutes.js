@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const aiController = require('../controllers/aiController');
-const { query } = require('../config/database');
+const appController = require('../controllers/appController');
 
 function asyncHandler(fn) {
   return function wrapped(req, res, next) {
@@ -17,30 +17,7 @@ function requireAuth(req, res, next) {
 }
 
 // GET /dashboard
-router.get('/dashboard', requireAuth, asyncHandler(async (req, res) => {
-  const subjects = [
-    { name: 'Python', icon: '🐍' },
-    { name: 'React', icon: '⚛️' },
-    { name: 'History', icon: '📜' },
-    { name: 'Physics', icon: '🔭' },
-    { name: 'JavaScript', icon: '💻' },
-    { name: 'SQL', icon: '🗄️' },
-    { name: 'Machine Learning', icon: '🤖' },
-    { name: 'System Design', icon: '🏗️' }
-  ];
-
-  const courses = await query(
-    'SELECT id, topic, progress, level, created_at FROM courses WHERE user_id = ? ORDER BY id DESC',
-    [req.session.user.id]
-  );
-
-  res.render('dashboard', {
-    title: 'Dashboard',
-    subjects,
-    courses,
-    user: req.session.user
-  });
-}));
+router.get('/dashboard', requireAuth, asyncHandler(appController.getDashboard));
 
 // GET /quiz/:subject
 router.get('/quiz/:subject', requireAuth, asyncHandler(async (req, res) => {
@@ -98,9 +75,66 @@ router.post('/quiz/submit', requireAuth, asyncHandler(async (req, res) => {
     
     // Redirect to report page instead of course
     res.redirect(`/report/${courseResult.insertId}`);
+    const grading = await aiController.gradeQuiz(subject, quiz, userAnswers);
+
+    const analysis = quiz.map((q, idx) => {
+      const selectedIndex = Number.isInteger(userAnswers[idx]) ? userAnswers[idx] : -1;
+      const correctIndex = Number.isInteger(q.correctIndex) ? q.correctIndex : 0;
+      const selected = selectedIndex >= 0 ? q.options?.[selectedIndex] : null;
+      const correctAnswer = q.options?.[correctIndex] || null;
+
+      const pq = Array.isArray(grading.per_question)
+        ? grading.per_question.find((p) => Number(p.index) === idx)
+        : null;
+
+      return {
+        index: idx,
+        question: q.question,
+        selectedIndex,
+        selected,
+        correctIndex,
+        correctAnswer,
+        correct: selectedIndex === correctIndex,
+        weak_topic: typeof q.weak_topic === 'string' ? q.weak_topic : null,
+        note: pq && typeof pq.note === 'string' ? pq.note : ''
+      };
+    });
+
+    // Store assessment in Firestore
+    const { db, admin } = require('../config/firebase');
+    const assessmentRef = await db.collection('assessments').add({
+      userId: req.session.user.id,
+      topic: subject,
+      score: grading.score,
+      feedback_text: grading.feedback_text,
+      analysis_json: analysis,
+      userAnswers,
+      quizQuestions: quiz,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    req.session.currentAssessment = {
+      ...current,
+      userAnswers,
+      grading,
+      assessmentId: assessmentRef.id
+    };
+
+    const scoreOutOf100 = Math.round((grading.score / 5) * 100);
+    const levelBadge = scoreOutOf100 < 60 ? 'Apprentice' : 'Adept';
+
+    res.render('report', {
+      title: `Report: ${subject}`,
+      subject,
+      grading,
+      analysis,
+      scoreOutOf100,
+      levelBadge,
+      assessmentId: assessmentRef.id
+    });
   } catch (err) {
     console.error(err);
-    res.redirect('/dashboard?error=' + encodeURIComponent('Failed to process quiz results.'));
+    res.redirect('/dashboard?error=' + encodeURIComponent(err.message || 'Failed to process quiz results.'));
   }
 }));
 
@@ -154,28 +188,26 @@ router.get('/report/:id', requireAuth, asyncHandler(async (req, res) => {
     score
   });
 }));
+// POST /assessment/:id/generate-map
+router.post('/assessment/:id/generate-map', requireAuth, asyncHandler(appController.generateMapFromAssessment));
 
 // GET /course/:id
 router.get('/course/:id', requireAuth, asyncHandler(async (req, res) => {
-  const courseId = parseInt(req.params.id, 10);
-  const rows = await query('SELECT * FROM courses WHERE id = ? AND user_id = ?', [courseId, req.session.user.id]);
+  const courseId = req.params.id;
+  const { db } = require('../config/firebase');
   
-  if (!rows.length) {
+  const courseDoc = await db.collection('courses').doc(courseId).get();
+  
+  if (!courseDoc.exists || courseDoc.data().userId !== req.session.user.id) {
     return res.redirect('/dashboard?error=' + encodeURIComponent('Course not found.'));
   }
 
-  const course = rows[0];
-  let syllabus = [];
-  try {
-    syllabus = JSON.parse(course.syllabus_json);
-  } catch (e) {
-    syllabus = [];
-  }
+  const course = { id: courseId, ...courseDoc.data() };
 
   res.render('course', {
     title: course.topic,
     course,
-    syllabus
+    syllabus: course.syllabus || []
   });
 }));
 
@@ -183,77 +215,39 @@ router.get('/course/:id', requireAuth, asyncHandler(async (req, res) => {
 router.get('/course/:id/lesson/:moduleIndex/:topicIndex', requireAuth, asyncHandler(async (req, res) => {
   const { id, moduleIndex, topicIndex } = req.params;
   
-  const rows = await query('SELECT * FROM courses WHERE id = ? AND user_id = ?', [id, req.session.user.id]);
-  if (!rows.length) {
+  const { db } = require('../config/firebase');
+  const courseDoc = await db.collection('courses').doc(id).get();
+  
+  if (!courseDoc.exists || courseDoc.data().userId !== req.session.user.id) {
     return res.status(404).json({ error: 'Course not found' });
   }
 
-  const course = rows[0];
-  const syllabus = JSON.parse(course.syllabus_json);
+  const course = { id, ...courseDoc.data() };
+  const syllabus = course.syllabus || [];
+
   const modIdx = parseInt(moduleIndex, 10);
   const topIdx = parseInt(topicIndex, 10);
 
-  if (!syllabus[modIdx] || !syllabus[modIdx].topics[topIdx]) {
+  const unlockedThroughModule = Number.isInteger(course.completed_modules) ? course.completed_modules : 0;
+  if (modIdx > unlockedThroughModule) {
+    return res.status(403).json({ error: 'This module is locked. Pass the exit quiz to unlock it.' });
+  }
+
+  if (!syllabus[modIdx] || !syllabus[modIdx].topics || !syllabus[modIdx].topics[topIdx]) {
     return res.status(404).json({ error: 'Topic not found' });
   }
 
   const topicName = syllabus[modIdx].topics[topIdx];
-  const lessonContent = await aiController.generateLesson(topicName, course.level);
+  const lessonContent = await appController.getLessonForTopic(id, modIdx, topIdx, topicName, course.level);
 
   res.json(lessonContent);
 }));
 
-// POST /course/:id/complete - Track lesson completion and award XP
-router.post('/course/:id/complete', requireAuth, asyncHandler(async (req, res) => {
-  const courseId = parseInt(req.params.id, 10);
-  const userId = req.session.user.id;
-  const { moduleIndex, topicIndex, xpEarned = 100 } = req.body;
+// POST /course/:id/complete
+router.post('/course/:id/complete', requireAuth, asyncHandler(appController.completeLesson));
 
-  // Verify course ownership
-  const courseRows = await query('SELECT * FROM courses WHERE id = ? AND user_id = ?', [courseId, userId]);
-  if (!courseRows.length) {
-    return res.status(404).json({ error: 'Course not found' });
-  }
-
-  const course = courseRows[0];
-  const syllabus = JSON.parse(course.syllabus_json);
-
-  if (!syllabus[moduleIndex] || !syllabus[moduleIndex].topics[topicIndex]) {
-    return res.status(404).json({ error: 'Topic not found' });
-  }
-
-  // Check if lesson was already completed
-  const completedRows = await query(
-    'SELECT id FROM lesson_completions WHERE user_id = ? AND course_id = ? AND module_index = ? AND topic_index = ?',
-    [userId, courseId, moduleIndex, topicIndex]
-  );
-
-  if (!completedRows.length) {
-    // Insert lesson completion
-    await query(
-      'INSERT INTO lesson_completions (user_id, course_id, module_index, topic_index, xp_earned) VALUES (?, ?, ?, ?, ?)',
-      [userId, courseId, moduleIndex, topicIndex, xpEarned]
-    );
-
-    // Update user's total XP and streak
-    await query('UPDATE users SET total_xp = total_xp + ?, last_lesson_date = CURRENT_DATE WHERE id = ?', [xpEarned, userId]);
-
-    // Update streak (simplified logic - would need more sophisticated date checking in production)
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-    const userRows = await query('SELECT last_lesson_date FROM users WHERE id = ?', [userId]);
-    
-    if (userRows[0].last_lesson_date === yesterdayStr) {
-      await query('UPDATE users SET streak_days = streak_days + 1 WHERE id = ?', [userId]);
-    } else if (!userRows[0].last_lesson_date || userRows[0].last_lesson_date < yesterdayStr) {
-      await query('UPDATE users SET streak_days = 1 WHERE id = ?', [userId]);
-    }
-  }
-
-  res.json({ success: true, xpEarned  });
-}));
+// POST /course/:id/verify-module
+router.post('/course/:id/verify-module', requireAuth, asyncHandler(appController.verifyModuleMastery));
 
 // GET /course/:id/module/:moduleIndex/exit-quiz - Generate module exit quiz
 router.get('/course/:id/module/:moduleIndex/exit-quiz', requireAuth, asyncHandler(async (req, res) => {
@@ -329,10 +323,12 @@ router.post('/course/:id/module/:moduleIndex/verify', requireAuth, asyncHandler(
 
 // POST /course/:id/tutor
 router.post('/course/:id/tutor', requireAuth, asyncHandler(async (req, res) => {
-  const courseId = parseInt(req.params.id, 10);
-  const rows = await query('SELECT * FROM courses WHERE id = ? AND user_id = ?', [courseId, req.session.user.id]);
+  const courseId = req.params.id;
+  const { db } = require('../config/firebase');
+  
+  const courseDoc = await db.collection('courses').doc(courseId).get();
 
-  if (!rows.length) {
+  if (!courseDoc.exists || courseDoc.data().userId !== req.session.user.id) {
     return res.status(404).json({ error: 'Course not found' });
   }
 
@@ -344,7 +340,7 @@ router.post('/course/:id/tutor', requireAuth, asyncHandler(async (req, res) => {
   const lessonTopic = typeof req.body.lessonTopic === 'string' ? req.body.lessonTopic.trim() : '';
   const lessonText = typeof req.body.lessonText === 'string' ? req.body.lessonText : '';
 
-  const course = rows[0];
+  const course = { ...courseDoc.data() };
 
   const answer = await aiController.generateTutorResponse({
     question,
@@ -355,6 +351,32 @@ router.post('/course/:id/tutor', requireAuth, asyncHandler(async (req, res) => {
   });
 
   res.json({ answer });
+}));
+
+// NEW: POST /course/:id/chat - AI Chatbot endpoint
+router.post('/course/:id/chat', requireAuth, asyncHandler(async (req, res) => {
+  const courseId = req.params.id;
+  const { db } = require('../config/firebase');
+  
+  const courseDoc = await db.collection('courses').doc(courseId).get();
+
+  if (!courseDoc.exists || courseDoc.data().userId !== req.session.user.id) {
+    return res.status(404).json({ error: 'Course not found' });
+  }
+
+  const { question, lessonContext } = req.body;
+
+  if (!question || !question.trim()) {
+    return res.status(400).json({ error: 'Question is required' });
+  }
+
+  try {
+    const answer = await aiController.getChatResponse(question.trim(), lessonContext || '');
+    res.json({ answer });
+  } catch (error) {
+    console.error('Chat error:', error);
+    res.status(500).json({ error: 'Failed to get AI response.' });
+  }
 }));
 
 module.exports = router;
